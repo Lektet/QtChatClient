@@ -16,9 +16,6 @@ find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets LinguistTools Network REQU
 
 set(TS_FILES Client_en_US.ts)
 
-set(TCP_LIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../TcpDataTransmitter/build-TcpDataTransmitter-Desktop-Debug/libTcpDataTransmitter.a")
-set(TCP_LIB_INCLUDES_PATH "../../TcpDataTransmitter/TcpDataTransmitter/")
-
 set(PROJECT_SOURCES
         main.cpp
         ChatRequest.h
@@ -74,10 +71,9 @@ else()
     qt5_create_translation(QM_FILES ${CMAKE_SOURCE_DIR} ${TS_FILES})
 endif()
 
-target_include_directories(Client PRIVATE ${TCP_LIB_INCLUDES_PATH})
 target_link_libraries(Client PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
     PRIVATE Qt${QT_VERSION_MAJOR}::Network
-    PRIVATE ${TCP_LIB_PATH})
+    PRIVATE TcpDataTransmitter)
 
 set_target_properties(Client PROPERTIES
     MACOSX_BUNDLE_GUI_IDENTIFIER my.example.com
