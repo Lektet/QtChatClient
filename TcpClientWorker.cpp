@@ -16,7 +16,8 @@ const QString requestTypeStringLiteral = ProtocolFormat::getProtocolStringLitera
 
 TcpClientWorker::TcpClientWorker(QObject *parent)
     : QObject{parent},
-      currentRequest(nullptr)
+      currentRequest(nullptr),
+      lastSocketState(QTcpSocket::UnconnectedState)
 {
     connect(&workerSocket, &QTcpSocket::readyRead, this, &TcpClientWorker::onReadyRead);
     connect(&workerSocket, &QTcpSocket::stateChanged, this, &TcpClientWorker::onSocketStateChanged);
@@ -45,6 +46,19 @@ void TcpClientWorker::addSendChatMessageRequest(QJsonObject message)
 void TcpClientWorker::start()
 {
     workerSocket.connectToHost(defaultHost, defaultPort);
+}
+
+void TcpClientWorker::stop()
+{
+    workerSocket.disconnectFromHost();
+}
+
+bool TcpClientWorker::isDisconnected()
+{
+    std::lock_guard<std::mutex> lock(socketMutex);
+    qDebug() << "socket last state: " << lastSocketState;
+    qDebug() << "socket last state is unconnected: " << (lastSocketState == QTcpSocket::UnconnectedState);
+    return  lastSocketState == QTcpSocket::UnconnectedState;
 }
 
 void TcpClientWorker::onReadyRead()
@@ -79,6 +93,10 @@ void TcpClientWorker::onReadyRead()
 
 void TcpClientWorker::onSocketStateChanged(QAbstractSocket::SocketState state)
 {
+    qDebug() << "Socket state changed: " << state;
+    socketMutex.lock();
+    lastSocketState = state;
+    socketMutex.unlock();
     switch (state) {
     case QTcpSocket::UnconnectedState:{
         emit noConnectionToServer();

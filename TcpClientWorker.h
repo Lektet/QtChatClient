@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <queue>
+#include <mutex>
 
 class ChatRequest;
 
@@ -18,6 +19,9 @@ public:
     explicit TcpClientWorker(QObject *parent = nullptr);
 
     void start();
+    void stop();
+
+    bool isDisconnected();
 
 public slots:
     void addGetChatRequest();
@@ -29,6 +33,7 @@ signals:
     void chatMessageSent();
     void noConnectionToServer();
     void connectionToServerEstablished();
+    void connectionFailed();
     void chatHasBeenUpdated();
 
 private:
@@ -36,6 +41,9 @@ private:
     std::shared_ptr<ChatRequest> currentRequest;
 
     QTcpSocket workerSocket;
+
+    QTcpSocket::SocketState lastSocketState;
+    std::mutex socketMutex;
 
     void onReadyRead();
     void onSocketStateChanged(QAbstractSocket::SocketState);

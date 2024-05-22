@@ -91,6 +91,9 @@ MainWidget::MainWidget(QWidget *parent)
     connect(tcpClient, &TcpClient::noConnectionToServer, this, &MainWidget::onNoConnectionToServer);
     tcpClient->startRequestProcessing();
     connect(tcpClient, &TcpClient::chatHasBeenUpdated, this, &MainWidget::onChatUpdated);
+    connect(tcpClient, &TcpClient::processingFinished, this, [this](){
+        close();
+    });
 }
 
 MainWidget::~MainWidget()
@@ -170,7 +173,9 @@ void MainWidget::onNoConnectionToServer()
             tcpClient->startRequestProcessing();
             break;
         case QMessageBox::Cancel:
-            close();
+            tcpClient->quitRequestProcessing();
+            break;
+        default:
             break;
     }
 }

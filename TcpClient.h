@@ -1,4 +1,4 @@
-#ifndef TCPCLIENT_H
+﻿#ifndef TCPCLIENT_H
 #define TCPCLIENT_H
 
 #include <QObject>
@@ -22,21 +22,30 @@ public:
     explicit TcpClient(QObject *parent = nullptr);
     ~TcpClient();
 
-    void addGetChatRequest();
-    void addSendChatMessageRequest(const QJsonObject& message);
+    void addGetChatRequest() const;
+    void addSendChatMessageRequest(const QJsonObject& message) const;
 
     void startRequestProcessing();
+    void quitRequestProcessing();
 
 signals:
     void chatHistoryReceived(const QJsonArray& history);
     void chatMessageSent();
     void noConnectionToServer();
     void connectionToServerEstablished();
+    void connectionFailed();
     void chatHasBeenUpdated();
 
+    void processingFinished();
+
 private:
-    QThread workerThread;
+    QThread* workerThread;
     TcpClientWorker* worker;
+    bool stopping;
+
+    void onNoConnectionToServer();
+
+    void stopWorker() const;
 };
 
 #endif // TCPCLIENT_H

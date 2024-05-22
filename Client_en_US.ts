@@ -29,7 +29,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="162"/>
+        <location filename="MainWidget.cpp" line="165"/>
         <source>No connection to server.
 Try to reconnect?</source>
         <translation type="unfinished"></translation>
@@ -39,7 +39,13 @@ Try to reconnect?</source>
     <name>MainWindow</name>
     <message>
         <location filename="mainwindow.ui" line="14"/>
+        <location filename="../Server/mainwindow.ui" line="14"/>
         <source>MainWindow</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../Server/mainwindow.cpp" line="21"/>
+        <source>Unable to start server</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
