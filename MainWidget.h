@@ -41,7 +41,7 @@ private:
 
 private slots:
     void onSendButtonPressed();
-    void onChatMessageSent();
+    void onChatMessageSentSuccess();
     void onChatHistoryReceived(const QJsonArray& chatHistory);
     void onNoConnectionToServer();
     void onChatUpdated();

@@ -73,7 +73,8 @@ endif()
 
 target_link_libraries(Client PRIVATE Qt${QT_VERSION_MAJOR}::Widgets
     PRIVATE Qt${QT_VERSION_MAJOR}::Network
-    PRIVATE TcpDataTransmitter)
+    PRIVATE TcpDataTransmitter
+    PRIVATE MessagingSystem)
 
 set_target_properties(Client PROPERTIES
     MACOSX_BUNDLE_GUI_IDENTIFIER my.example.com

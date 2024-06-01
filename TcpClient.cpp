@@ -18,8 +18,8 @@ TcpClient::TcpClient(QObject *parent)
     worker->moveToThread(workerThread);
     connect(worker, &TcpClientWorker::chatHistoryReceived,
             this, &TcpClient::chatHistoryReceived, Qt::QueuedConnection);
-    connect(worker, &TcpClientWorker::chatMessageSent,
-            this, &TcpClient::chatMessageSent, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::chatMessageSentSuccess,
+            this, &TcpClient::chatMessageSentSuccess, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::noConnectionToServer,
             this, &TcpClient::onNoConnectionToServer, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::connectionToServerEstablished,

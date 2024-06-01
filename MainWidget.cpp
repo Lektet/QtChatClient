@@ -83,7 +83,7 @@ MainWidget::MainWidget(QWidget *parent)
 
     connect(sendButton, &QPushButton::pressed, this, &MainWidget::onSendButtonPressed);
 
-    connect(tcpClient, &TcpClient::chatMessageSent, this, &MainWidget::onChatMessageSent);
+    connect(tcpClient, &TcpClient::chatMessageSentSuccess, this, &MainWidget::onChatMessageSentSuccess);
     connect(tcpClient, &TcpClient::chatHistoryReceived, this, &MainWidget::onChatHistoryReceived);
     connect(tcpClient, &TcpClient::connectionToServerEstablished, this, [this](){
         tcpClient->addGetChatRequest();
@@ -145,7 +145,7 @@ void MainWidget::onSendButtonPressed()
     tcpClient->addSendChatMessageRequest(message);
 }
 
-void MainWidget::onChatMessageSent()
+void MainWidget::onChatMessageSentSuccess()
 {
     qDebug() << "Chat message sent";
     tcpClient->addGetChatRequest();
@@ -153,7 +153,7 @@ void MainWidget::onChatMessageSent()
 
 void MainWidget::onChatHistoryReceived(const QJsonArray &chatHistory)
 {
-    qDebug() << "Chat history: " << chatHistory;
+//    qDebug() << "Chat history: " << chatHistory;
     messageModel->setMessages(chatHistory);
     messagesViewer->setDataFromModel(messageModel);
     messagesViewer->verticalScrollBar()->setValue(messagesViewer->verticalScrollBar()->maximum());

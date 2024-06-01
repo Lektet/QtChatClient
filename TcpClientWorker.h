@@ -10,6 +10,8 @@
 #include <mutex>
 
 class ChatRequest;
+class SimpleMessage;
+class NotificationMessage;
 
 class TcpClientWorker : public QObject
 {
@@ -30,25 +32,26 @@ public slots:
 signals:
 
     void chatHistoryReceived(const QJsonArray& history);
-    void chatMessageSent();
+    void chatMessageSentSuccess();
     void noConnectionToServer();
     void connectionToServerEstablished();
     void connectionFailed();
     void chatHasBeenUpdated();
 
-private:
-    std::queue<std::shared_ptr<ChatRequest>> requestQueue;//TODO: Make ChatRequest const
-    std::shared_ptr<ChatRequest> currentRequest;
+private:;
+    std::queue<std::shared_ptr<SimpleMessage>> requestQueue;
+    std::shared_ptr<SimpleMessage> currentRequest;
 
     QTcpSocket workerSocket;
 
     QTcpSocket::SocketState lastSocketState;
     std::mutex socketMutex;
+    bool inRequestProcessing;
 
     void onReadyRead();
     void onSocketStateChanged(QAbstractSocket::SocketState);
     void processTopRequest();
-    void processNotification(const QJsonObject&);
+    void processNotification(std::shared_ptr<NotificationMessage> notitification);
 
    bool isInRequestProcessing() const;
    void continueRequestProcessing();

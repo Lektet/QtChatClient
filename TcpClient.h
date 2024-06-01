@@ -30,7 +30,7 @@ public:
 
 signals:
     void chatHistoryReceived(const QJsonArray& history);
-    void chatMessageSent();
+    void chatMessageSentSuccess();
     void noConnectionToServer();
     void connectionToServerEstablished();
     void connectionFailed();
