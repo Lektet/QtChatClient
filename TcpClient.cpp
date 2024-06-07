@@ -2,8 +2,6 @@
 
 #include <QHostAddress>
 
-#include "GetChatHistoryRequest.h"
-#include "SendChatMessage.h"
 #include "TcpClientWorker.h"
 
 const QHostAddress defaultHost = QHostAddress::LocalHost;

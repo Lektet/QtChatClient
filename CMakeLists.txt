@@ -18,12 +18,8 @@ set(TS_FILES Client_en_US.ts)
 
 set(PROJECT_SOURCES
         main.cpp
-        ChatRequest.h
-        ChatRequest.cpp
         DependingWidthWidget.h
         DependingWidthWidget.cpp
-        GetChatHistoryRequest.h
-        GetChatHistoryRequest.cpp
         MainWidget.cpp
         MainWidget.h
         MessageDataRole.h
@@ -35,8 +31,6 @@ set(PROJECT_SOURCES
         MessageModel.cpp
         MessagesViewer.h
         MessagesViewer.cpp
-        SendChatMessage.h
-        SendChatMessage.cpp
         TcpClient.h
         TcpClient.cpp
         TcpClientWorker.h

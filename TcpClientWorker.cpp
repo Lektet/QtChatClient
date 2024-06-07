@@ -3,9 +3,6 @@
 #include <QHostAddress>
 #include <QJsonDocument>
 
-#include "GetChatHistoryRequest.h"
-#include "SendChatMessage.h"
-
 #include "MessageType.h"
 #include "MessageUtils.h"
 #include "GetHistoryMessage.h"
@@ -17,12 +14,11 @@
 #include "NotificationType.h"
 
 #include "TcpDataTransmitter.h"
-#include "ProtocolFormatSrings.h"
 
 const QHostAddress defaultHost = QHostAddress::LocalHost;
 const quint16 defaultPort = 44000;
 
-const QString requestTypeStringLiteral = ProtocolFormat::getProtocolStringLiteral(ProtocolFormat::ProtocolStringLiteral::REQUEST_TYPE_KEY_NAME);
+const int REQUEST_TIMEOUT = 10000;
 
 TcpClientWorker::TcpClientWorker(QObject *parent)
     : QObject{parent},
@@ -30,6 +26,11 @@ TcpClientWorker::TcpClientWorker(QObject *parent)
       lastSocketState(QTcpSocket::UnconnectedState),
       inRequestProcessing(false)
 {
+    requestTimer.setParent(this);
+    requestTimer.setSingleShot(true);
+    requestTimer.setInterval(REQUEST_TIMEOUT);
+    connect(&requestTimer, &QTimer::timeout, this, &TcpClientWorker::finishRequest);
+
     connect(&workerSocket, &QTcpSocket::readyRead, this, &TcpClientWorker::onReadyRead);
     connect(&workerSocket, &QTcpSocket::stateChanged, this, &TcpClientWorker::onSocketStateChanged);
 }
@@ -67,73 +68,22 @@ bool TcpClientWorker::isDisconnected()
 void TcpClientWorker::onReadyRead()
 {
     auto receivedData = TcpDataTransmitter::receiveData(workerSocket);
-    QJsonParseError jsonParseError;
-    auto receivedDocument = QJsonDocument::fromJson(receivedData, &jsonParseError);
-//    qDebug() << "response: " << receivedData;
-    if(receivedDocument.isNull()){
-        qWarning() << "Response parse error: " << jsonParseError.errorString();
-        requestFinished();
-        return;
-    }
-    if(!receivedDocument.isObject()){
-        qWarning() << "Response is not JSON object";
-        requestFinished();
-        return;
-    }
 
-    auto receivedMessage = MessageUtils::createMessageFromJson(receivedDocument);
-
-    auto receivedMessageType = receivedMessage->getMessageType();
-    qDebug() << "responseRequestType: " << messageTypeToString(receivedMessageType);
-    if(receivedMessageType == MessageType::Notification){
-        auto notificationMessage = std::static_pointer_cast<NotificationMessage>(receivedMessage);
-        processNotification(notificationMessage);
-        return;
-    }
-
-    if(!inRequestProcessing){
-        qDebug() << "No response to be expected";
-        return;
-    }
-
-    if(currentRequest == nullptr){
-        qCritical() << "Invalid pointer";
-        return;
-    }
-
-    auto sentMessageType = currentRequest->getMessageType();
-    qDebug() << "current request type: " << messageTypeToString(sentMessageType);
-    switch (receivedMessageType){
-        case MessageType::GetHistoryResponse:{
-            if(currentRequest->getMessageType() != MessageType::GetHistory){
-                qDebug() << "Invalid message type";
-                return;
-            }
-
-            auto responseMessage = std::static_pointer_cast<GetHistoryResponseMessage>(receivedMessage);
-            emit chatHistoryReceived(responseMessage->getMessagesHistory());
-            break;
+    bool currentRequestProcessed = false;
+    for(auto& data : receivedData){
+        bool responseReceived = false;
+        processMessageData(data, responseReceived);
+        if(currentRequestProcessed == responseReceived == true){
+            qWarning() << "Inapropriate message received";
         }
-        case MessageType::SendMessageResponse:{
-            if(currentRequest->getMessageType() != MessageType::SendMessage){
-                qDebug() << "Invalid message type";
-                break;
-            }
-
-            auto responseMessage = std::static_pointer_cast<SendMessageResponseMessage>(receivedMessage);
-            if(responseMessage->getResult() != Result::Success){
-                qDebug() << "Message sent failed";
-            }
-            else{
-                emit chatMessageSentSuccess();
-            }
-            break;
+        else if(responseReceived){
+            currentRequestProcessed = true;
         }
-        default:
-            break;
     }
 
-    requestFinished();
+    if(currentRequestProcessed){
+        finishRequest();
+    }
 }
 
 void TcpClientWorker::onSocketStateChanged(QAbstractSocket::SocketState state)
@@ -165,11 +115,12 @@ void TcpClientWorker::processTopRequest()
 
     inRequestProcessing = true;
     currentRequest = requestQueue.front();
-    qDebug() << "Request to send: " << messageTypeToString(currentRequest->getMessageType());
+    qDebug() << "Message to send: " << messageTypeToString(currentRequest->getMessageType());
     if(!TcpDataTransmitter::sendData(currentRequest->toJson().toJson(), workerSocket)){
         qDebug() << "Chat request failed";
         return;
     }
+    requestTimer.start();
 }
 
 void TcpClientWorker::processNotification(std::shared_ptr<NotificationMessage> notitification)
@@ -177,6 +128,75 @@ void TcpClientWorker::processNotification(std::shared_ptr<NotificationMessage> n
     if(notitification->getNotificationType() == NotificationType::MessagesUpdated){
         emit chatHasBeenUpdated();
     }
+}
+
+void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseReceived)
+{
+    QJsonParseError jsonParseError;
+    auto document = QJsonDocument::fromJson(data, &jsonParseError);
+//    qDebug() << "response: " << receivedData;
+    if(document.isNull()){
+        qWarning() << "Response parse error: " << jsonParseError.errorString();
+        return;
+    }
+    if(!document.isObject()){
+        qWarning() << "Response is not JSON object";
+        return;
+    }
+
+    auto message = MessageUtils::createMessageFromJson(document);
+
+    auto messageType = message->getMessageType();
+    qDebug() << "Message type: " << messageTypeToString(messageType);
+
+    if(messageType == MessageType::Notification){
+        auto notificationMessage = std::static_pointer_cast<NotificationMessage>(message);
+        processNotification(notificationMessage);
+        return;
+    }
+    else if(!inRequestProcessing){
+        qDebug() << "No data to be expected";
+        return;
+    }
+
+    if(currentRequest == nullptr){
+        qCritical() << "Invalid pointer";
+        return;
+    }
+
+    auto sentMessageType = currentRequest->getMessageType();
+    qDebug() << "Sent message type: " << messageTypeToString(sentMessageType);
+    switch (messageType){
+        case MessageType::GetHistoryResponse:{
+            if(sentMessageType != MessageType::GetHistory){
+                qDebug() << "Invalid message type";
+                break;
+            }
+
+            auto responseMessage = std::static_pointer_cast<GetHistoryResponseMessage>(message);
+            emit chatHistoryReceived(responseMessage->getMessagesHistory());
+            break;
+        }
+        case MessageType::SendMessageResponse:{
+            if(sentMessageType != MessageType::SendMessage){
+                qDebug() << "Invalid message type";
+                break;
+            }
+
+            auto responseMessage = std::static_pointer_cast<SendMessageResponseMessage>(message);
+            if(responseMessage->getResult() != Result::Success){
+                qDebug() << "Message sent failed";
+            }
+            else{
+                emit chatMessageSentSuccess();
+            }
+            break;
+        }
+        default:
+            break;
+    }
+
+    responseReceived = true;
 }
 
 bool TcpClientWorker::isInRequestProcessing() const
@@ -191,8 +211,9 @@ void TcpClientWorker::continueRequestProcessing()
     }
 }
 
-void TcpClientWorker::requestFinished()
+void TcpClientWorker::finishRequest()
 {
+    requestTimer.stop();
     inRequestProcessing = false;
     currentRequest = nullptr;
     if(requestQueue.size() != 0){

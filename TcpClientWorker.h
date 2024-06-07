@@ -4,12 +4,12 @@
 #include <QObject>
 #include <QJsonObject>
 #include <QTcpSocket>
+#include <QTimer>
 
 #include <memory>
 #include <queue>
 #include <mutex>
 
-class ChatRequest;
 class SimpleMessage;
 class NotificationMessage;
 
@@ -43,6 +43,7 @@ private:;
     std::shared_ptr<SimpleMessage> currentRequest;
 
     QTcpSocket workerSocket;
+    QTimer requestTimer;
 
     QTcpSocket::SocketState lastSocketState;
     std::mutex socketMutex;
@@ -52,10 +53,11 @@ private:;
     void onSocketStateChanged(QAbstractSocket::SocketState);
     void processTopRequest();
     void processNotification(std::shared_ptr<NotificationMessage> notitification);
+    void processMessageData(const QByteArray& data, bool& responseReceived);
 
    bool isInRequestProcessing() const;
    void continueRequestProcessing();
-   void requestFinished();
+   void finishRequest();
 };
 
 #endif // TCPCLIENTWORKER_H

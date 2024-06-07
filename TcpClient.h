@@ -12,7 +12,6 @@
 #include <future>
 #include <condition_variable>
 
-class ChatRequest;
 class TcpClientWorker;
 
 class TcpClient : public QObject
