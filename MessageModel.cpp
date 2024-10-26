@@ -9,7 +9,7 @@
 const QString MESSAGE_USERNAME_KEY = "Username";
 const QString MESSAGE_TEXT_KEY = "Text";
 const QString MESSAGE_ID_KEY = "Id";
-const QString MESSAGE_TIME_KEY = "Time";
+const QString MESSAGE_POST_TIME_KEY = "Time";
 
 MessageModel::MessageModel(QObject *parent) :
     QAbstractListModel{parent}
@@ -25,44 +25,44 @@ int MessageModel::rowCount(const QModelIndex &parent) const
 QVariant MessageModel::data(const QModelIndex &index, int role) const
 {
     if(!index.isValid()){
-        qDebug() << "Invalid model index";
+        qWarning() << "Invalid model index";
         return QVariant();
+    }
+
+    if(index.row() >= messages.size()){
+        qWarning() << "Incorrect model index";
     }
 
     switch (role) {
         case MessageDataRole::Id:{
-            auto jsonObject = messages.at(index.row()).toObject();
-            return jsonObject.value(MESSAGE_ID_KEY).toVariant();
+            return messages.at(index.row()).id;
             break;
-    }
+        }
+        case MessageDataRole::Username:{
+            return messages.at(index.row()).username;
+            break;
+        }
         case MessageDataRole::Text:{
-            auto jsonObject = messages.at(index.row()).toObject();
-            return jsonObject.value(MESSAGE_TEXT_KEY).toVariant();
+            return messages.at(index.row()).text;
             break;
-    }
+        }
         case MessageDataRole::Time:{
-            auto jsonObject = messages.at(index.row()).toObject();
             bool convertIsOk = false;
-            auto msecs = jsonObject.value(MESSAGE_TIME_KEY).toVariant().toLongLong(&convertIsOk);
+            auto msecs = messages.at(index.row()).postTime.toLongLong(&convertIsOk);
             if(!convertIsOk){
-                qDebug() << "Error converting jdonObject value to quint64";
+                qDebug() << "Error converting QString value to quint64";
                 return QVariant();
             }
             return QDateTime::fromMSecsSinceEpoch(msecs);
             break;
-    }
-        case MessageDataRole::Username:{
-            auto jsonObject = messages.at(index.row()).toObject();
-            return jsonObject.value(MESSAGE_USERNAME_KEY).toVariant();
-            break;
-}
+        }
         default:
             return QVariant();
     }
 }
 
 //TODO: Make only required changes in messages
-void MessageModel::setMessages(const QJsonArray &messages)
+void MessageModel::setMessages(const std::vector<ChatMessageData> messages)
 {
     beginResetModel();
     this->messages = messages;

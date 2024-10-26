@@ -6,13 +6,18 @@
 #include <QTcpSocket>
 #include <QThread>
 
+#include "ChatMessageData.h"
+
 #include <queue>
 #include <thread>
 #include <mutex>
 #include <future>
 #include <condition_variable>
+#include <vector>
 
 class TcpClientWorker;
+
+struct NewChatMessageData;
 
 class TcpClient : public QObject
 {
@@ -22,17 +27,17 @@ public:
     ~TcpClient();
 
     void addGetChatRequest() const;
-    void addSendChatMessageRequest(const QJsonObject& message) const;
+    void addSendChatMessageRequest(const NewChatMessageData &message) const;
 
     void startRequestProcessing();
     void quitRequestProcessing();
 
 signals:
-    void chatHistoryReceived(const QJsonArray& history);
+    void chatHistoryReceived(const std::vector<ChatMessageData>& history);
     void chatMessageSentSuccess();
-    void noConnectionToServer();
     void connectionToServerEstablished();
-    void connectionFailed();
+    void disconnectedFromServer();
+    void connectionErrorOccured();
     void chatHasBeenUpdated();
 
     void processingFinished();
@@ -40,11 +45,6 @@ signals:
 private:
     QThread* workerThread;
     TcpClientWorker* worker;
-    bool stopping;
-
-    void onNoConnectionToServer();
-
-    void stopWorker() const;
 };
 
 #endif // TCPCLIENT_H

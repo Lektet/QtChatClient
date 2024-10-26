@@ -4,10 +4,10 @@
 #include <Qt>
 
 enum MessageDataRole{
-    Time = Qt::ItemDataRole::UserRole + 1,
-    Id,
+    Id= Qt::ItemDataRole::UserRole + 1,
     Username,
-    Text
+    Text,
+    Time
 };
 
 #endif // MESSAGEDATAROLE_H

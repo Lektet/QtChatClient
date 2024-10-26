@@ -4,24 +4,27 @@
 
 #include "TcpClientWorker.h"
 
+#include "NewChatMessageData.h"
+
 const QHostAddress defaultHost = QHostAddress::LocalHost;
 const quint16 defaultPort = 44000;
 
 TcpClient::TcpClient(QObject *parent)
     : QObject{parent},
       workerThread(new QThread(this)),
-      worker(new TcpClientWorker()),
-      stopping(false)
+      worker(new TcpClientWorker())
 {
     worker->moveToThread(workerThread);
     connect(worker, &TcpClientWorker::chatHistoryReceived,
             this, &TcpClient::chatHistoryReceived, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::chatMessageSentSuccess,
             this, &TcpClient::chatMessageSentSuccess, Qt::QueuedConnection);
-    connect(worker, &TcpClientWorker::noConnectionToServer,
-            this, &TcpClient::onNoConnectionToServer, Qt::QueuedConnection);
-    connect(worker, &TcpClientWorker::connectionToServerEstablished,
+    connect(worker, &TcpClientWorker::connectedToServer,
             this, &TcpClient::connectionToServerEstablished, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::disconnectedFromServer,
+            this, &TcpClient::disconnectedFromServer, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::connectionErrorOccured,
+            this, &TcpClient::connectionErrorOccured, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::chatHasBeenUpdated,
             this, &TcpClient::chatHasBeenUpdated, Qt::QueuedConnection);
 
@@ -30,6 +33,8 @@ TcpClient::TcpClient(QObject *parent)
         worker->deleteLater();
         emit processingFinished();
     });
+
+    qRegisterMetaType<NewChatMessageData>();
 }
 
 TcpClient::~TcpClient()
@@ -44,12 +49,12 @@ void TcpClient::addGetChatRequest() const
                               Qt::QueuedConnection);
 }
 
-void TcpClient::addSendChatMessageRequest(const QJsonObject &message) const
+void TcpClient::addSendChatMessageRequest(const NewChatMessageData &message) const
 {    
     QMetaObject::invokeMethod(worker,
                               "addSendChatMessageRequest",
                               Qt::QueuedConnection,
-                              Q_ARG(QJsonObject, message));
+                              Q_ARG(NewChatMessageData, message));
 }
 
 void TcpClient::startRequestProcessing()
@@ -62,27 +67,14 @@ void TcpClient::startRequestProcessing()
 
 void TcpClient::quitRequestProcessing()
 {
-    stopping = true;
-    if(worker->isDisconnected()){
-        workerThread->quit();
+    if(!workerThread->isRunning()){
+        qWarning() << "TcpClient was not started";
         return;
     }
 
-    stopWorker();
-}
-
-void TcpClient::onNoConnectionToServer()
-{
-    if(stopping){
-        workerThread->quit();
-    }
-
-    emit noConnectionToServer();
-}
-
-void TcpClient::stopWorker() const
-{
     QMetaObject::invokeMethod(worker,
                               &TcpClientWorker::stop,
                               Qt::QueuedConnection);
+    workerThread->quit();
+    workerThread->wait();
 }

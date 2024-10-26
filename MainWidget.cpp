@@ -7,10 +7,14 @@
 #include <QMessageBox>
 #include <QScrollBar>
 
+#include <QCloseEvent>
+
 #include "TcpClient.h"
 #include "MessageModel.h"
 #include "MessageItemDelegate.h"
 #include "MessagesViewer.h"
+
+#include "NewChatMessageData.h"
 
 #include <QDebug>
 
@@ -76,9 +80,6 @@ MainWidget::MainWidget(QWidget *parent)
 
     widgetLayout->addWidget(messageField);
 
-
-
-
     widgetLayout->addWidget(sendButton);
 
     connect(sendButton, &QPushButton::pressed, this, &MainWidget::onSendButtonPressed);
@@ -88,23 +89,26 @@ MainWidget::MainWidget(QWidget *parent)
     connect(tcpClient, &TcpClient::connectionToServerEstablished, this, [this](){
         tcpClient->addGetChatRequest();
     });
-    connect(tcpClient, &TcpClient::noConnectionToServer, this, &MainWidget::onNoConnectionToServer);
+    connect(tcpClient, &TcpClient::connectionErrorOccured, this, &MainWidget::onConnectionErrorOccured);
     tcpClient->startRequestProcessing();
     connect(tcpClient, &TcpClient::chatHasBeenUpdated, this, &MainWidget::onChatUpdated);
-    connect(tcpClient, &TcpClient::processingFinished, this, [this](){
-        close();
-    });
 }
 
 MainWidget::~MainWidget()
 {
 }
 
+void MainWidget::closeEvent(QCloseEvent *event)
+{
+    tcpClient->quitRequestProcessing();
+    event->accept();
+}
+
 void MainWidget::paintEvent(QPaintEvent *event)
 {
     QWidget::paintEvent(event);
 
-    //Только здесь, при первом запуске, скроллбар будет visible
+    //Only here on first launch scrollbar will be "visible"
     auto delegateWidth = chatHistoryView->width();
     if(chatHistoryView->verticalScrollBar()->isVisible()){
         delegateWidth -= chatHistoryView->verticalScrollBar()->width();
@@ -138,10 +142,7 @@ void MainWidget::onSendButtonPressed()
     }
 
 
-    QJsonObject message;
-    message.insert(MESSAGE_USERNAME_KEY, usernameField->text());
-    message.insert(MESSAGE_TEXT_KEY, messageField->toPlainText());
-
+    NewChatMessageData message(usernameField->text(), messageField->toPlainText());
     tcpClient->addSendChatMessageRequest(message);
 }
 
@@ -151,15 +152,14 @@ void MainWidget::onChatMessageSentSuccess()
     tcpClient->addGetChatRequest();
 }
 
-void MainWidget::onChatHistoryReceived(const QJsonArray &chatHistory)
+void MainWidget::onChatHistoryReceived(const std::vector<ChatMessageData> chatHistory)
 {
-//    qDebug() << "Chat history: " << chatHistory;
-    messageModel->setMessages(chatHistory);
+    messageModel->setMessages(std::move(chatHistory));
     messagesViewer->setDataFromModel(messageModel);
     messagesViewer->verticalScrollBar()->setValue(messagesViewer->verticalScrollBar()->maximum());
 }
 
-void MainWidget::onNoConnectionToServer()
+void MainWidget::onConnectionErrorOccured()
 {
     QMessageBox msgBox;
     msgBox.setText(tr("No connection to server.\nTry to reconnect?"));
@@ -173,7 +173,7 @@ void MainWidget::onNoConnectionToServer()
             tcpClient->startRequestProcessing();
             break;
         case QMessageBox::Cancel:
-            tcpClient->quitRequestProcessing();
+            close();
             break;
         default:
             break;

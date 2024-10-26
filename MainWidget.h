@@ -10,6 +10,8 @@
 #include <QTextEdit>
 #include <QPushButton>
 
+#include "ChatMessageData.h"
+
 class MessageItemDelegate;
 class TcpClient;
 class MessageModel;
@@ -22,6 +24,9 @@ class MainWidget : public QWidget
 public:
     MainWidget(QWidget *parent = nullptr);
     ~MainWidget();
+
+protected:
+    virtual void closeEvent(QCloseEvent *event) override;
 
 private:
     QVBoxLayout* widgetLayout;
@@ -42,8 +47,8 @@ private:
 private slots:
     void onSendButtonPressed();
     void onChatMessageSentSuccess();
-    void onChatHistoryReceived(const QJsonArray& chatHistory);
-    void onNoConnectionToServer();
+    void onChatHistoryReceived(const std::vector<ChatMessageData> chatHistory);
+    void onConnectionErrorOccured();
     void onChatUpdated();
 };
 #endif // MAINWINDOW_H

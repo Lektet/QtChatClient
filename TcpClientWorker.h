@@ -13,6 +13,9 @@
 class SimpleMessage;
 class NotificationMessage;
 
+struct ChatMessageData;
+struct NewChatMessageData;
+
 class TcpClientWorker : public QObject
 {
     Q_OBJECT
@@ -23,34 +26,30 @@ public:
     void start();
     void stop();
 
-    bool isDisconnected();
-
 public slots:
     void addGetChatRequest();
-    void addSendChatMessageRequest(QJsonObject message);
+    void addSendChatMessageRequest(const NewChatMessageData& message);
 
 signals:
 
-    void chatHistoryReceived(const QJsonArray& history);
+    void chatHistoryReceived(const std::vector<ChatMessageData> history);
     void chatMessageSentSuccess();
-    void noConnectionToServer();
-    void connectionToServerEstablished();
-    void connectionFailed();
+    void connectedToServer();
+    void disconnectedFromServer();
+    void connectionErrorOccured();
     void chatHasBeenUpdated();
 
 private:;
     std::queue<std::shared_ptr<SimpleMessage>> requestQueue;
     std::shared_ptr<SimpleMessage> currentRequest;
 
-    QTcpSocket workerSocket;
+    std::unique_ptr<QTcpSocket> workerSocket;
     QTimer requestTimer;
 
-    QTcpSocket::SocketState lastSocketState;
-    std::mutex socketMutex;
+    std::mutex socketStateMutex;
     bool inRequestProcessing;
 
     void onReadyRead();
-    void onSocketStateChanged(QAbstractSocket::SocketState);
     void processTopRequest();
     void processNotification(std::shared_ptr<NotificationMessage> notitification);
     void processMessageData(const QByteArray& data, bool& responseReceived);
@@ -58,6 +57,9 @@ private:;
    bool isInRequestProcessing() const;
    void continueRequestProcessing();
    void finishRequest();
+
+private slots:
+   void onSocketErrorOccured(QAbstractSocket::SocketError socketError);
 };
 
 #endif // TCPCLIENTWORKER_H
