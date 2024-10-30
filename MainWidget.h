@@ -42,13 +42,15 @@ private:
     TcpClient* tcpClient;
     MessageModel* messageModel;
 
+    bool disconnecting;
+
     virtual void paintEvent(QPaintEvent *event) override;
 
 private slots:
     void onSendButtonPressed();
     void onChatMessageSentSuccess();
     void onChatHistoryReceived(const std::vector<ChatMessageData> chatHistory);
-    void onConnectionErrorOccured();
+    void onTcpClientStopped();
     void onChatUpdated();
 };
 #endif // MAINWINDOW_H

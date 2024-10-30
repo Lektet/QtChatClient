@@ -11,29 +11,10 @@ const quint16 defaultPort = 44000;
 
 TcpClient::TcpClient(QObject *parent)
     : QObject{parent},
-      workerThread(new QThread(this)),
-      worker(new TcpClientWorker())
+      workerThread(nullptr),
+      worker(nullptr),
+      active(false)
 {
-    worker->moveToThread(workerThread);
-    connect(worker, &TcpClientWorker::chatHistoryReceived,
-            this, &TcpClient::chatHistoryReceived, Qt::QueuedConnection);
-    connect(worker, &TcpClientWorker::chatMessageSentSuccess,
-            this, &TcpClient::chatMessageSentSuccess, Qt::QueuedConnection);
-    connect(worker, &TcpClientWorker::connectedToServer,
-            this, &TcpClient::connectionToServerEstablished, Qt::QueuedConnection);
-    connect(worker, &TcpClientWorker::disconnectedFromServer,
-            this, &TcpClient::disconnectedFromServer, Qt::QueuedConnection);
-    connect(worker, &TcpClientWorker::connectionErrorOccured,
-            this, &TcpClient::connectionErrorOccured, Qt::QueuedConnection);
-    connect(worker, &TcpClientWorker::chatHasBeenUpdated,
-            this, &TcpClient::chatHasBeenUpdated, Qt::QueuedConnection);
-
-    connect(workerThread, &QThread::finished, this, [this](){
-        qDebug() << "workerThread finished";
-        worker->deleteLater();
-        emit processingFinished();
-    });
-
     qRegisterMetaType<NewChatMessageData>();
 }
 
@@ -44,6 +25,11 @@ TcpClient::~TcpClient()
 
 void TcpClient::addGetChatRequest() const
 {
+    if(!active){
+        qCritical() << "Client is not started!";
+        return;
+    }
+
     QMetaObject::invokeMethod(worker,
                               &TcpClientWorker::addGetChatRequest,
                               Qt::QueuedConnection);
@@ -51,23 +37,45 @@ void TcpClient::addGetChatRequest() const
 
 void TcpClient::addSendChatMessageRequest(const NewChatMessageData &message) const
 {    
+    if(!active){
+        qWarning() << "Client was not started!";
+        return;
+    }
+
     QMetaObject::invokeMethod(worker,
                               "addSendChatMessageRequest",
                               Qt::QueuedConnection,
                               Q_ARG(NewChatMessageData, message));
 }
 
-void TcpClient::startRequestProcessing()
+void TcpClient::start()
 {
+    active = true;
+
+    workerThread = new QThread(this);
+    worker = new TcpClientWorker();
+
+    worker->moveToThread(workerThread);
+    connect(worker, &TcpClientWorker::chatHistoryReceived,
+            this, &TcpClient::chatHistoryReceived, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::chatMessageSentSuccess,
+            this, &TcpClient::chatMessageSentSuccess, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::startedSucessfully,
+            this, &TcpClient::startedSuccessfully, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::stopped,
+            this, &TcpClient::onWorkerStopped, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::chatHasBeenUpdated,
+            this, &TcpClient::chatHasBeenUpdated, Qt::QueuedConnection);
+
     workerThread->start();
     QMetaObject::invokeMethod(worker,
                               &TcpClientWorker::start,
                               Qt::QueuedConnection);
 }
 
-void TcpClient::quitRequestProcessing()
+void TcpClient::stop()
 {
-    if(!workerThread->isRunning()){
+    if(!active){
         qWarning() << "TcpClient was not started";
         return;
     }
@@ -75,6 +83,27 @@ void TcpClient::quitRequestProcessing()
     QMetaObject::invokeMethod(worker,
                               &TcpClientWorker::stop,
                               Qt::QueuedConnection);
+
+}
+
+bool TcpClient::isActive() const
+{
+    return active;
+}
+
+void TcpClient::onWorkerStopped()
+{
+    if(!active){
+        qCritical() << "Client was not started";
+        return;
+    }
+    active = false;
+
     workerThread->quit();
     workerThread->wait();
+
+    worker->deleteLater();
+    workerThread->deleteLater();
+
+    emit stopped();
 }

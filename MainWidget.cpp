@@ -39,19 +39,14 @@ MainWidget::MainWidget(QWidget *parent)
       messageField(new QTextEdit()),
       sendButton(new QPushButton(tr("sendButton"))),
       tcpClient(new TcpClient(this)),
-      messageModel(new MessageModel(this))
+      messageModel(new MessageModel(this)),
+      disconnecting(false)
 {
     usernameErrorLabel->setStyleSheet(ERROR_LABEL_STYLE);
     usernameErrorLabel->hide();
     messageErrorLabel->setStyleSheet(ERROR_LABEL_STYLE);
     messageErrorLabel->hide();
 
-//    chatHistoryView->setModel(messageModel);
-//    messageItemDelegate->setWidth(chatHistoryView->width());
-//    chatHistoryView->setItemDelegate(messageItemDelegate);
-//    chatHistoryView->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-//    chatHistoryView->setStyleSheet(CHAT_HISTORY_VIEW_STYLE);
-//    widgetLayout->addWidget(chatHistoryView);
     messagesViewer->setDataFromModel(messageModel);
     widgetLayout->addWidget(messagesViewer);
 
@@ -86,11 +81,11 @@ MainWidget::MainWidget(QWidget *parent)
 
     connect(tcpClient, &TcpClient::chatMessageSentSuccess, this, &MainWidget::onChatMessageSentSuccess);
     connect(tcpClient, &TcpClient::chatHistoryReceived, this, &MainWidget::onChatHistoryReceived);
-    connect(tcpClient, &TcpClient::connectionToServerEstablished, this, [this](){
+    connect(tcpClient, &TcpClient::startedSuccessfully, this, [this](){
         tcpClient->addGetChatRequest();
     });
-    connect(tcpClient, &TcpClient::connectionErrorOccured, this, &MainWidget::onConnectionErrorOccured);
-    tcpClient->startRequestProcessing();
+    connect(tcpClient, &TcpClient::stopped, this, &MainWidget::onTcpClientStopped);
+    tcpClient->start();
     connect(tcpClient, &TcpClient::chatHasBeenUpdated, this, &MainWidget::onChatUpdated);
 }
 
@@ -100,8 +95,14 @@ MainWidget::~MainWidget()
 
 void MainWidget::closeEvent(QCloseEvent *event)
 {
-    tcpClient->quitRequestProcessing();
-    event->accept();
+    if(disconnecting || !tcpClient->isActive()){
+        event->accept();
+    }
+    else{
+        disconnecting = true;
+        tcpClient->stop();
+        event->ignore();
+    }
 }
 
 void MainWidget::paintEvent(QPaintEvent *event)
@@ -159,8 +160,13 @@ void MainWidget::onChatHistoryReceived(const std::vector<ChatMessageData> chatHi
     messagesViewer->verticalScrollBar()->setValue(messagesViewer->verticalScrollBar()->maximum());
 }
 
-void MainWidget::onConnectionErrorOccured()
+void MainWidget::onTcpClientStopped()
 {
+    if(disconnecting){
+        close();
+        return;
+    }
+
     QMessageBox msgBox;
     msgBox.setText(tr("No connection to server.\nTry to reconnect?"));
     msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::Cancel);
@@ -170,7 +176,7 @@ void MainWidget::onConnectionErrorOccured()
 
     switch (ret) {
         case QMessageBox::Yes :
-            tcpClient->startRequestProcessing();
+            tcpClient->start();
             break;
         case QMessageBox::Cancel:
             close();

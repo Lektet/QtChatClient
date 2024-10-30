@@ -30,14 +30,14 @@ public slots:
     void addGetChatRequest();
     void addSendChatMessageRequest(const NewChatMessageData& message);
 
-signals:
+signals:    
+    void startedSucessfully();
 
     void chatHistoryReceived(const std::vector<ChatMessageData> history);
     void chatMessageSentSuccess();
-    void connectedToServer();
-    void disconnectedFromServer();
-    void connectionErrorOccured();
     void chatHasBeenUpdated();
+
+    void stopped();
 
 private:;
     std::queue<std::shared_ptr<SimpleMessage>> requestQueue;
@@ -49,6 +49,8 @@ private:;
     std::mutex socketStateMutex;
     bool inRequestProcessing;
 
+    bool connected;
+
     void onReadyRead();
     void processTopRequest();
     void processNotification(std::shared_ptr<NotificationMessage> notitification);
@@ -59,6 +61,8 @@ private:;
    void finishRequest();
 
 private slots:
+   void onConnected();
+   void onDisconnected();
    void onSocketErrorOccured(QAbstractSocket::SocketError socketError);
 };
 

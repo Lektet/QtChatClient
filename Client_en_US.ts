@@ -19,17 +19,17 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="62"/>
+        <location filename="MainWidget.cpp" line="57"/>
         <source>Username:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="74"/>
+        <location filename="MainWidget.cpp" line="69"/>
         <source>Message:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="165"/>
+        <location filename="MainWidget.cpp" line="171"/>
         <source>No connection to server.
 Try to reconnect?</source>
         <translation type="unfinished"></translation>

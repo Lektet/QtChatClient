@@ -29,22 +29,27 @@ public:
     void addGetChatRequest() const;
     void addSendChatMessageRequest(const NewChatMessageData &message) const;
 
-    void startRequestProcessing();
-    void quitRequestProcessing();
+    void start();
+    void stop();
+
+    bool isActive() const;
 
 signals:
+    void startedSuccessfully();
+    void stopped();
+
     void chatHistoryReceived(const std::vector<ChatMessageData>& history);
     void chatMessageSentSuccess();
-    void connectionToServerEstablished();
-    void disconnectedFromServer();
-    void connectionErrorOccured();
     void chatHasBeenUpdated();
-
-    void processingFinished();
 
 private:
     QThread* workerThread;
     TcpClientWorker* worker;
+
+    bool active;
+
+private slots:
+    void onWorkerStopped();
 };
 
 #endif // TCPCLIENT_H

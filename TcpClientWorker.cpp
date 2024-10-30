@@ -26,7 +26,8 @@ TcpClientWorker::TcpClientWorker(QObject *parent)
     : QObject{parent},
       currentRequest(nullptr),
       workerSocket(nullptr),
-      inRequestProcessing(false)
+      inRequestProcessing(false),
+      connected(false)
 {
     requestTimer.setParent(this);
     requestTimer.setSingleShot(true);
@@ -54,8 +55,8 @@ void TcpClientWorker::start()
     }
     workerSocket = std::make_unique<QTcpSocket>();
     connect(workerSocket.get(), &QTcpSocket::readyRead, this, &TcpClientWorker::onReadyRead);
-    connect(workerSocket.get(), &QTcpSocket::connected, this, &TcpClientWorker::connectedToServer);
-    connect(workerSocket.get(), &QTcpSocket::disconnected, this, &TcpClientWorker::disconnectedFromServer);
+    connect(workerSocket.get(), &QTcpSocket::connected, this, &TcpClientWorker::onConnected);
+    connect(workerSocket.get(), &QTcpSocket::disconnected, this, &TcpClientWorker::onDisconnected);
     connect(workerSocket.get(), &QTcpSocket::errorOccurred, this, &TcpClientWorker::onSocketErrorOccured);
     workerSocket->connectToHost(defaultHost, defaultPort);
 }
@@ -118,7 +119,6 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
 {
     QJsonParseError jsonParseError;
     auto document = QJsonDocument::fromJson(data, &jsonParseError);
-//    qDebug() << "response: " << receivedData;
     if(document.isNull()){
         qWarning() << "Response parse error: " << jsonParseError.errorString();
         return;
@@ -210,8 +210,20 @@ void TcpClientWorker::finishRequest()
     }
 }
 
+void TcpClientWorker::onConnected()
+{
+    connected = true;
+    emit startedSucessfully();
+}
+
+void TcpClientWorker::onDisconnected()
+{
+    connected = false;
+    emit stopped();
+}
+
 void TcpClientWorker::onSocketErrorOccured(QAbstractSocket::SocketError socketError)
 {
     qDebug() << "Socket error: " << socketError;
-    emit connectionErrorOccured();
+    if(!connected) emit stopped();
 }
