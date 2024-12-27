@@ -7,8 +7,8 @@
 #include "MessageUtils.h"
 #include "GetHistoryMessage.h"
 #include "GetHistoryResponseMessage.h"
-#include "SendMessageMessage.h"
-#include "SendMessageResponseMessage.h"
+#include "AddMessageMessage.h"
+#include "AddMessageResponseMessage.h"
 #include "NotificationMessage.h"
 #include "Result.h"
 #include "NotificationType.h"
@@ -43,7 +43,7 @@ void TcpClientWorker::addGetChatRequest()
 
 void TcpClientWorker::addSendChatMessageRequest(const NewChatMessageData& message)
 {
-    requestQueue.push(std::make_shared<SendMessageMessage>(message));
+    requestQueue.push(std::make_shared<AddMessageMessage>(message));
     continueRequestProcessing();
 }
 
@@ -91,7 +91,7 @@ void TcpClientWorker::onReadyRead()
     }
 }
 
-void TcpClientWorker::processTopRequest()
+void TcpClientWorker::processTopRequest()//TODO: Process top request through event loop
 {
     if(currentRequest != nullptr){
         qWarning() << "Request is already in process!";
@@ -162,13 +162,13 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
             emit chatHistoryReceived(responseMessage->getMessagesHistory());
             break;
         }
-        case MessageType::SendMessageResponse:{
-            if(currentRequestMessageType != MessageType::SendMessage){
+        case MessageType::AddMessageResponse:{
+            if(currentRequestMessageType != MessageType::AddMessage){
                 qWarning() << "Invalid message type";
                 break;
             }
 
-            auto responseMessage = std::static_pointer_cast<SendMessageResponseMessage>(message);
+            auto responseMessage = std::static_pointer_cast<AddMessageResponseMessage>(message);
             if(responseMessage->getResult() != Result::Success){
                 qWarning() << "Message sent failed";
             }
@@ -224,6 +224,7 @@ void TcpClientWorker::onDisconnected()
 
 void TcpClientWorker::onSocketErrorOccured(QAbstractSocket::SocketError socketError)
 {
-    qDebug() << "Socket error: " << socketError;
+    qWarning() << "Socket error: " << socketError;
+    qWarning() << "Socket error description: " << workerSocket->errorString();
     if(!connected) emit stopped();
 }

@@ -43,10 +43,5 @@ Try to reconnect?</source>
         <source>MainWindow</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
-        <location filename="../Server/mainwindow.cpp" line="20"/>
-        <source>Unable to start server</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 </TS>

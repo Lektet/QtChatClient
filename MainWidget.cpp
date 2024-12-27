@@ -53,7 +53,7 @@ MainWidget::MainWidget(QWidget *parent)
     widgetLayout->addSpacing(5);
 
     auto usernameLabelsLayout = new QHBoxLayout();
-    usernameLabelsLayout->setMargin(0);
+    // usernameLabelsLayout->setMargin(0);
     auto usernameLabel = new QLabel(tr("Username:"));
     usernameLabelsLayout->addWidget(usernameLabel);
     usernameLabelsLayout->addWidget(usernameErrorLabel);
@@ -65,7 +65,7 @@ MainWidget::MainWidget(QWidget *parent)
     widgetLayout->addSpacing(5);
 
     auto messageLabelsLayout = new QHBoxLayout();
-    messageLabelsLayout->setMargin(0);
+    // messageLabelsLayout->setMargin(0);
     auto messageLabel = new QLabel(tr("Message:"));
     messageLabelsLayout->addWidget(messageLabel);
     messageLabelsLayout->addWidget(messageErrorLabel);
@@ -149,8 +149,7 @@ void MainWidget::onSendButtonPressed()
 
 void MainWidget::onChatMessageSentSuccess()
 {
-    qDebug() << "Chat message sent";
-    tcpClient->addGetChatRequest();
+    qDebug() << "Chat message sent successfully";
 }
 
 void MainWidget::onChatHistoryReceived(const std::vector<ChatMessageData> chatHistory)
