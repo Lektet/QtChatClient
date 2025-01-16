@@ -11,9 +11,10 @@ const quint16 defaultPort = 44000;
 
 TcpClient::TcpClient(QObject *parent)
     : QObject{parent},
-      workerThread(nullptr),
-      worker(nullptr),
-      active(false)
+    workerThread(nullptr),
+    worker(nullptr),
+    started(false),
+    restarting(false)
 {
     qRegisterMetaType<NewChatMessageData>();
 }
@@ -25,7 +26,7 @@ TcpClient::~TcpClient()
 
 void TcpClient::addGetChatRequest() const
 {
-    if(!active){
+    if(!started){
         qCritical() << "Client is not started!";
         return;
     }
@@ -37,7 +38,7 @@ void TcpClient::addGetChatRequest() const
 
 void TcpClient::addSendChatMessageRequest(const NewChatMessageData &message) const
 {    
-    if(!active){
+    if(!started){
         qWarning() << "Client was not started!";
         return;
     }
@@ -48,9 +49,9 @@ void TcpClient::addSendChatMessageRequest(const NewChatMessageData &message) con
                               Q_ARG(NewChatMessageData, message));
 }
 
-void TcpClient::start()
+void TcpClient::start(const QString &host, const quint16 port)
 {
-    active = true;
+    started = true;
 
     workerThread = new QThread(this);
     worker = new TcpClientWorker();
@@ -69,13 +70,18 @@ void TcpClient::start()
 
     workerThread->start();
     QMetaObject::invokeMethod(worker,
-                              &TcpClientWorker::start,
+                              &TcpClientWorker::init,
                               Qt::QueuedConnection);
+    QMetaObject::invokeMethod(worker,
+                              "start",
+                              Qt::QueuedConnection,
+                              Q_ARG(QString, host),
+                              Q_ARG(quint16, port));
 }
 
 void TcpClient::stop()
 {
-    if(!active){
+    if(!started){
         qWarning() << "TcpClient was not started";
         return;
     }
@@ -86,18 +92,28 @@ void TcpClient::stop()
 
 }
 
-bool TcpClient::isActive() const
+void TcpClient::restart(const QString &host, const quint16 port)
 {
-    return active;
+    restarting = true;
+    hostForRestart = host;
+    portForRestart= port;
+    stop();
+}
+
+bool TcpClient::isStarted() const
+{
+    return started;
 }
 
 void TcpClient::onWorkerStopped()
 {
-    if(!active){
+    qDebug() << "onWorkerStopped()";
+
+    if(!started){
         qCritical() << "Client was not started";
         return;
     }
-    active = false;
+    started = false;
 
     workerThread->quit();
     workerThread->wait();
@@ -105,5 +121,11 @@ void TcpClient::onWorkerStopped()
     worker->deleteLater();
     workerThread->deleteLater();
 
-    emit stopped();
+    if(!restarting){
+        emit stopped();
+    }
+    else{
+        restarting = false;
+        start(hostForRestart, portForRestart);
+    }
 }

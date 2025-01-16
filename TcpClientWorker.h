@@ -23,10 +23,11 @@ class TcpClientWorker : public QObject
 public:
     explicit TcpClientWorker(QObject *parent = nullptr);
 
-    void start();
+public slots:
+    void init();
+    void start(const QString &host, const quint16 port);
     void stop();
 
-public slots:
     void addGetChatRequest();
     void addSendChatMessageRequest(const NewChatMessageData& message);
 

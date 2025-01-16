@@ -8,11 +8,6 @@
 
 #include "ChatMessageData.h"
 
-#include <queue>
-#include <thread>
-#include <mutex>
-#include <future>
-#include <condition_variable>
 #include <vector>
 
 class TcpClientWorker;
@@ -29,10 +24,11 @@ public:
     void addGetChatRequest() const;
     void addSendChatMessageRequest(const NewChatMessageData &message) const;
 
-    void start();
+    void start(const QString& host, const quint16 port);
     void stop();
+    void restart(const QString& host, const quint16 port);
 
-    bool isActive() const;
+    bool isStarted() const;
 
 signals:
     void startedSuccessfully();
@@ -46,7 +42,10 @@ private:
     QThread* workerThread;
     TcpClientWorker* worker;
 
-    bool active;
+    bool started;
+    bool restarting;
+    QString hostForRestart;
+    quint16 portForRestart;
 
 private slots:
     void onWorkerStopped();

@@ -21,6 +21,7 @@ const QHostAddress defaultHost = QHostAddress::LocalHost;
 const quint16 defaultPort = 44000;
 
 const int REQUEST_TIMEOUT = 10000;
+const int DISCONNECT_TIMEOUT = 5000;
 
 TcpClientWorker::TcpClientWorker(QObject *parent)
     : QObject{parent},
@@ -35,6 +36,19 @@ TcpClientWorker::TcpClientWorker(QObject *parent)
     connect(&requestTimer, &QTimer::timeout, this, &TcpClientWorker::finishRequest);
 }
 
+void TcpClientWorker::init()
+{
+    workerSocket = std::make_unique<QTcpSocket>();
+    connect(workerSocket.get(), &QTcpSocket::readyRead, this, &TcpClientWorker::onReadyRead);
+    connect(workerSocket.get(), &QTcpSocket::connected, this, &TcpClientWorker::onConnected);
+    connect(workerSocket.get(), &QTcpSocket::disconnected, this, &TcpClientWorker::onDisconnected);
+    connect(workerSocket.get(), &QTcpSocket::errorOccurred, this, &TcpClientWorker::onSocketErrorOccured);
+    connect(workerSocket.get(), &QTcpSocket::stateChanged,
+            this, [this](QAbstractSocket::SocketState socketState){
+                qDebug() << "Worker socket state: " << socketState;
+            });
+}
+
 void TcpClientWorker::addGetChatRequest()
 {
     requestQueue.push(std::make_shared<GetHistoryMessage>());
@@ -47,27 +61,29 @@ void TcpClientWorker::addSendChatMessageRequest(const NewChatMessageData& messag
     continueRequestProcessing();
 }
 
-void TcpClientWorker::start()
+void TcpClientWorker::start(const QString &host, const quint16 port)
 {
-    if(workerSocket != nullptr && workerSocket->state() != QTcpSocket::UnconnectedState){
+    Q_ASSERT(workerSocket != nullptr);
+    if(workerSocket->state() != QTcpSocket::UnconnectedState){
         qWarning() << "Worker is already started";
         return;
     }
-    workerSocket = std::make_unique<QTcpSocket>();
-    connect(workerSocket.get(), &QTcpSocket::readyRead, this, &TcpClientWorker::onReadyRead);
-    connect(workerSocket.get(), &QTcpSocket::connected, this, &TcpClientWorker::onConnected);
-    connect(workerSocket.get(), &QTcpSocket::disconnected, this, &TcpClientWorker::onDisconnected);
-    connect(workerSocket.get(), &QTcpSocket::errorOccurred, this, &TcpClientWorker::onSocketErrorOccured);
-    workerSocket->connectToHost(defaultHost, defaultPort);
+
+    workerSocket->connectToHost(host, port);
 }
 
 void TcpClientWorker::stop()
 {
-    if(workerSocket == nullptr || workerSocket->state() == QTcpSocket::UnconnectedState){
+    Q_ASSERT(workerSocket != nullptr);
+    if(workerSocket->state() == QTcpSocket::UnconnectedState){
         qDebug() << "Worker was not started";
         return;
     }
     workerSocket->disconnectFromHost();
+    if(!workerSocket->waitForDisconnected(DISCONNECT_TIMEOUT)){
+        qDebug() << "Socket disconnect timeout";
+        onSocketErrorOccured(workerSocket->error());
+    }
 }
 
 void TcpClientWorker::onReadyRead()

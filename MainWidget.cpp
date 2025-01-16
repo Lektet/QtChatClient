@@ -6,6 +6,9 @@
 #include <QHBoxLayout>
 #include <QMessageBox>
 #include <QScrollBar>
+#include <QToolBar>
+#include <QAction>
+#include <QSettings>
 
 #include <QCloseEvent>
 
@@ -13,6 +16,8 @@
 #include "MessageModel.h"
 #include "MessageItemDelegate.h"
 #include "MessagesViewer.h"
+#include "SettingsWidget.h"
+#include "Settings.h"
 
 #include "NewChatMessageData.h"
 
@@ -27,66 +32,64 @@ const QString CHAT_HISTORY_VIEW_STYLE = "QListView::item:selected{"
                                         "selection-background-color: rgb(128,128,255);"
                                         "}";
 
+const std::set<Settings> settingsRequiringReconnect = {
+    Settings::Host,
+    Settings::Port
+};
+
+bool reconnectRequiredForSettings(const std::set<Settings>& settings){
+    for(auto& requiredSetting: settingsRequiringReconnect){
+        for(auto& providedSetting: settings){
+            if (requiredSetting == providedSetting){
+                return true;
+            }
+        }
+    }
+    return false;
+};
+
 MainWidget::MainWidget(QWidget *parent)
     : QWidget(parent),
-      widgetLayout(new QVBoxLayout(this)),
-      chatHistoryView(new QListView()),
-      messageItemDelegate(new MessageItemDelegate(this)),
-      messagesViewer(new MessagesViewer(this)),
-      usernameErrorLabel(new QLabel(tr("Username empty!"))),
-      messageErrorLabel(new QLabel(tr("Message empty!"))),
-      usernameField(new QLineEdit()),
-      messageField(new QTextEdit()),
-      sendButton(new QPushButton(tr("sendButton"))),
-      tcpClient(new TcpClient(this)),
-      messageModel(new MessageModel(this)),
-      disconnecting(false)
+    settingsAction(new QAction(QIcon("://resources/icons/settings.png"), "")),
+    widgetLayout(new QVBoxLayout(this)),
+    chatHistoryView(new QListView()),
+    messageItemDelegate(new MessageItemDelegate(this)),
+    messagesViewer(new MessagesViewer(this)),
+    messageErrorLabel(new QLabel(tr("Message empty!"))),
+    messageField(new QTextEdit()),
+    sendButton(new QPushButton(tr("sendButton"))),
+    settingsWidget(std::make_shared<SettingsWidget>()),
+    tcpClient(new TcpClient(this)),
+    messageModel(new MessageModel(this)),
+    disconnecting(false)
 {
-    usernameErrorLabel->setStyleSheet(ERROR_LABEL_STYLE);
-    usernameErrorLabel->hide();
-    messageErrorLabel->setStyleSheet(ERROR_LABEL_STYLE);
-    messageErrorLabel->hide();
-
-    messagesViewer->setDataFromModel(messageModel);
-    widgetLayout->addWidget(messagesViewer);
-
-    widgetLayout->addSpacing(5);
-
-    auto usernameLabelsLayout = new QHBoxLayout();
-    // usernameLabelsLayout->setMargin(0);
-    auto usernameLabel = new QLabel(tr("Username:"));
-    usernameLabelsLayout->addWidget(usernameLabel);
-    usernameLabelsLayout->addWidget(usernameErrorLabel);
-
-    widgetLayout->addLayout(usernameLabelsLayout);
-    widgetLayout->setAlignment(usernameLabelsLayout, Qt::AlignLeft);
-
-    widgetLayout->addWidget(usernameField);
-    widgetLayout->addSpacing(5);
-
-    auto messageLabelsLayout = new QHBoxLayout();
-    // messageLabelsLayout->setMargin(0);
-    auto messageLabel = new QLabel(tr("Message:"));
-    messageLabelsLayout->addWidget(messageLabel);
-    messageLabelsLayout->addWidget(messageErrorLabel);
-
-    widgetLayout->addLayout(messageLabelsLayout);
-    widgetLayout->setAlignment(messageLabelsLayout, Qt::AlignLeft);
-
-    widgetLayout->addWidget(messageField);
-
-    widgetLayout->addWidget(sendButton);
+    setupLayout();
 
     connect(sendButton, &QPushButton::pressed, this, &MainWidget::onSendButtonPressed);
+    connect(settingsAction, &QAction::triggered, this, [this](){
+        setDisabled(true);
+        settingsWidget->show();
+    });
+    connect(settingsWidget.get(), &SettingsWidget::settingsSaved,
+            this, &MainWidget::onSettingsSaved);
+    connect(settingsWidget.get(), &SettingsWidget::canceled,
+            this, &MainWidget::onSettingsWidgetCanceled);
 
-    connect(tcpClient, &TcpClient::chatMessageSentSuccess, this, &MainWidget::onChatMessageSentSuccess);
-    connect(tcpClient, &TcpClient::chatHistoryReceived, this, &MainWidget::onChatHistoryReceived);
+    connect(tcpClient, &TcpClient::chatMessageSentSuccess,
+            this, &MainWidget::onChatMessageSentSuccess);
+    connect(tcpClient, &TcpClient::chatHistoryReceived,
+            this, &MainWidget::onChatHistoryReceived);
     connect(tcpClient, &TcpClient::startedSuccessfully, this, [this](){
         tcpClient->addGetChatRequest();
     });
     connect(tcpClient, &TcpClient::stopped, this, &MainWidget::onTcpClientStopped);
-    tcpClient->start();
     connect(tcpClient, &TcpClient::chatHasBeenUpdated, this, &MainWidget::onChatUpdated);
+
+    QSettings settings;
+    username = settings.value("username").toString();
+    auto serverHost = settings.value("serverHost").toString();
+    auto serverPort = settings.value("serverPort").toInt();
+    tcpClient->start(serverHost, serverPort);
 }
 
 MainWidget::~MainWidget()
@@ -95,7 +98,7 @@ MainWidget::~MainWidget()
 
 void MainWidget::closeEvent(QCloseEvent *event)
 {
-    if(disconnecting || !tcpClient->isActive()){
+    if(disconnecting || !tcpClient->isStarted()){
         event->accept();
     }
     else{
@@ -120,30 +123,58 @@ void MainWidget::paintEvent(QPaintEvent *event)
     }
 }
 
+void MainWidget::cleanChat()
+{
+    messageModel->setMessages(std::vector<ChatMessageData>());
+    messagesViewer->setDataFromModel(messageModel);
+}
+
+void MainWidget::setupLayout()
+{
+    widgetLayout->setContentsMargins(0, 0, 0, 0);
+
+    auto toolBar = new QToolBar(this);
+    auto spacer = new QWidget();
+    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    toolBar->addWidget(spacer);
+    toolBar->addAction(settingsAction);
+    widgetLayout->addWidget(toolBar);
+
+    auto widgetContentLayout = new QVBoxLayout();
+
+    messageErrorLabel->setStyleSheet(ERROR_LABEL_STYLE);
+    messageErrorLabel->hide();
+
+    messagesViewer->setDataFromModel(messageModel);
+    widgetContentLayout->addWidget(messagesViewer);
+
+    widgetContentLayout->addSpacing(5);
+
+    widgetContentLayout->setContentsMargins(11, 0, 11, 11);
+
+    auto messageLabelsLayout = new QHBoxLayout();
+    messageLabelsLayout->setContentsMargins(0, 0, 0, 0);
+    auto messageLabel = new QLabel(tr("Message:"));
+    messageLabelsLayout->addWidget(messageLabel);
+    messageLabelsLayout->addWidget(messageErrorLabel);
+
+    widgetContentLayout->addLayout(messageLabelsLayout);
+
+    widgetContentLayout->addWidget(messageField);
+
+    widgetContentLayout->addWidget(sendButton);
+
+    widgetLayout->addLayout(widgetContentLayout);
+}
+
 void MainWidget::onSendButtonPressed()
 {
-    bool requiredFieldIsEmpty = false;
-    if(usernameField->text().isEmpty()){
-        usernameErrorLabel->show();
-        requiredFieldIsEmpty = true;
-    }
-    else{
-        usernameErrorLabel->hide();
-    }
     if(messageField->toPlainText().isEmpty()){
         messageErrorLabel->show();
-        requiredFieldIsEmpty = true;
-    }
-    else{
-        messageErrorLabel->hide();
-    }
-
-    if(requiredFieldIsEmpty){
         return;
     }
 
-
-    NewChatMessageData message(usernameField->text(), messageField->toPlainText());
+    NewChatMessageData message(username, messageField->toPlainText());
     tcpClient->addSendChatMessageRequest(message);
 }
 
@@ -165,23 +196,10 @@ void MainWidget::onTcpClientStopped()
         close();
         return;
     }
-
-    QMessageBox msgBox;
-    msgBox.setText(tr("No connection to server.\nTry to reconnect?"));
-    msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::Cancel);
-    msgBox.setDefaultButton(QMessageBox::Yes);
-
-    auto ret = msgBox.exec();
-
-    switch (ret) {
-        case QMessageBox::Yes :
-            tcpClient->start();
-            break;
-        case QMessageBox::Cancel:
-            close();
-            break;
-        default:
-            break;
+    else{
+        setDisabled(true);
+        QMessageBox::warning(this, tr("Connection error"), tr("Failed to connect to server"));
+        settingsWidget->show();
     }
 }
 
@@ -190,3 +208,34 @@ void MainWidget::onChatUpdated()
     tcpClient->addGetChatRequest();
 }
 
+void MainWidget::onSettingsSaved(const std::set<Settings> &changedSettings)
+{
+    QSettings settings;
+    if(changedSettings.contains(Settings::Username)){
+        username = settings.value("username").toString();
+    }
+
+    auto serverHost = settings.value("serverHost").toString();
+    auto serverPort = settings.value("serverPort").toInt();
+
+    if(!tcpClient->isStarted()){
+        cleanChat();
+        tcpClient->start(serverHost, serverPort);
+    }
+    else if(reconnectRequiredForSettings(changedSettings)){
+        cleanChat();
+        tcpClient->restart(serverHost, serverPort);
+    }
+
+    setDisabled(false);
+}
+
+void MainWidget::onSettingsWidgetCanceled()
+{
+    if(tcpClient->isStarted()){
+        setDisabled(false);
+    }
+    else{
+        close();
+    }
+}
