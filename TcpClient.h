@@ -5,6 +5,7 @@
 
 #include <QTcpSocket>
 #include <QThread>
+#include <QUuid>
 
 #include "ChatMessageData.h"
 
@@ -21,8 +22,12 @@ public:
     explicit TcpClient(QObject *parent = nullptr);
     ~TcpClient();
 
-    void addGetChatRequest() const;
-    void addSendChatMessageRequest(const NewChatMessageData &message) const;
+    void addGetChatRequest(const QUuid& sessionId) const;
+    void addSendChatMessageRequest(const QUuid& sessionId,
+                                   const NewChatMessageData &message) const;
+
+    void initSession(const QUuid& userId, const QString& username);
+    void confirmSession(const QUuid& userId, const QUuid& sessionId);
 
     void start(const QString& host, const quint16 port);
     void stop();
@@ -37,6 +42,8 @@ signals:
     void chatHistoryReceived(const std::vector<ChatMessageData>& history);
     void chatMessageSentSuccess();
     void chatHasBeenUpdated();
+
+    void newSessionInitiated(bool initSuccess, const QUuid& userId, const QUuid& sessionId);
 
 private:
     QThread* workerThread;

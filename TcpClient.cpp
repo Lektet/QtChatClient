@@ -24,7 +24,7 @@ TcpClient::~TcpClient()
 
 }
 
-void TcpClient::addGetChatRequest() const
+void TcpClient::addGetChatRequest(const QUuid &sessionId) const
 {
     if(!started){
         qCritical() << "Client is not started!";
@@ -32,12 +32,13 @@ void TcpClient::addGetChatRequest() const
     }
 
     QMetaObject::invokeMethod(worker,
-                              &TcpClientWorker::addGetChatRequest,
-                              Qt::QueuedConnection);
+                              "addGetChatRequest",
+                              Qt::QueuedConnection,
+                              Q_ARG(QUuid, sessionId));
 }
 
-void TcpClient::addSendChatMessageRequest(const NewChatMessageData &message) const
-{    
+void TcpClient::addSendChatMessageRequest(const QUuid &sessionId, const NewChatMessageData &message) const
+{
     if(!started){
         qWarning() << "Client was not started!";
         return;
@@ -46,7 +47,36 @@ void TcpClient::addSendChatMessageRequest(const NewChatMessageData &message) con
     QMetaObject::invokeMethod(worker,
                               "addSendChatMessageRequest",
                               Qt::QueuedConnection,
+                              Q_ARG(QUuid, sessionId),
                               Q_ARG(NewChatMessageData, message));
+}
+
+void TcpClient::confirmSession(const QUuid &userId, const QUuid &sessionId)
+{
+    if(!started){
+        qWarning() << "Client was not started!";
+        return;
+    }
+
+    QMetaObject::invokeMethod(worker,
+                              "confirmSessionRequest",
+                              Qt::QueuedConnection,
+                              Q_ARG(QUuid, userId),
+                              Q_ARG(QUuid, sessionId));
+}
+
+void TcpClient::initSession(const QUuid &userId, const QString &username)
+{
+    if(!started){
+        qWarning() << "Client was not started!";
+        return;
+    }
+
+    QMetaObject::invokeMethod(worker,
+                              "requestNewSessionRequest",
+                              Qt::QueuedConnection,
+                              Q_ARG(QUuid, userId),
+                              Q_ARG(QString, username));
 }
 
 void TcpClient::start(const QString &host, const quint16 port)
@@ -57,6 +87,8 @@ void TcpClient::start(const QString &host, const quint16 port)
     worker = new TcpClientWorker();
 
     worker->moveToThread(workerThread);
+    connect(worker, &TcpClientWorker::newSessionInitiated,
+            this, &TcpClient::newSessionInitiated, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::chatHistoryReceived,
             this, &TcpClient::chatHistoryReceived, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::chatMessageSentSuccess,

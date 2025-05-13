@@ -75,13 +75,15 @@ MainWidget::MainWidget(QWidget *parent)
     connect(settingsWidget.get(), &SettingsWidget::canceled,
             this, &MainWidget::onSettingsWidgetCanceled);
 
+    connect(tcpClient, &TcpClient::newSessionInitiated,
+            this, &MainWidget::onNewSessionInitiated);
     connect(tcpClient, &TcpClient::chatMessageSentSuccess,
             this, &MainWidget::onChatMessageSentSuccess);
     connect(tcpClient, &TcpClient::chatHistoryReceived,
             this, &MainWidget::onChatHistoryReceived);
-    connect(tcpClient, &TcpClient::startedSuccessfully, this, [this](){
-        tcpClient->addGetChatRequest();
-    });
+    connect(tcpClient, &TcpClient::startedSuccessfully,
+            this, &MainWidget::onStartedSuccessfully);
+
     connect(tcpClient, &TcpClient::stopped, this, &MainWidget::onTcpClientStopped);
     connect(tcpClient, &TcpClient::chatHasBeenUpdated, this, &MainWidget::onChatUpdated);
 
@@ -175,12 +177,38 @@ void MainWidget::onSendButtonPressed()
     }
 
     NewChatMessageData message(username, messageField->toPlainText());
-    tcpClient->addSendChatMessageRequest(message);
+    tcpClient->addSendChatMessageRequest(sessionId, message);
 }
 
 void MainWidget::onChatMessageSentSuccess()
 {
     qDebug() << "Chat message sent successfully";
+}
+
+void MainWidget::onStartedSuccessfully()
+{
+    userId = QUuid::createUuid();
+    tcpClient->initSession(userId, username);
+}
+
+void MainWidget::onNewSessionInitiated(bool initSuccess, const QUuid &receivedUserId, const QUuid &receivedSessionId)
+{
+    if(!initSuccess){
+        QMessageBox::warning(this, tr("Login error"), tr("Invalid username"));
+        tcpClient->stop();//TODO: Implement login/logout logic
+        return;
+    }
+
+    if(receivedUserId != userId){
+        QMessageBox::warning(this, tr("Login error"), tr("Invalid user id"));
+        tcpClient->stop();//TODO: Implement login/logout logic
+        return;
+    }
+
+    sessionId = receivedSessionId;
+
+    tcpClient->confirmSession(userId, sessionId);
+    tcpClient->addGetChatRequest(sessionId);
 }
 
 void MainWidget::onChatHistoryReceived(const std::vector<ChatMessageData> chatHistory)
@@ -205,7 +233,7 @@ void MainWidget::onTcpClientStopped()
 
 void MainWidget::onChatUpdated()
 {
-    tcpClient->addGetChatRequest();
+    tcpClient->addGetChatRequest(sessionId);
 }
 
 void MainWidget::onSettingsSaved(const std::set<Settings> &changedSettings)

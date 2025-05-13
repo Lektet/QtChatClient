@@ -5,6 +5,9 @@
 
 #include "MessageType.h"
 #include "MessageUtils.h"
+#include "NewSessionRequestMessage.h"
+#include "NewSessionResponseMessage.h"
+#include "NewSessionConfirmMessage.h"
 #include "GetHistoryMessage.h"
 #include "GetHistoryResponseMessage.h"
 #include "AddMessageMessage.h"
@@ -49,15 +52,17 @@ void TcpClientWorker::init()
             });
 }
 
-void TcpClientWorker::addGetChatRequest()
+void TcpClientWorker::addGetChatRequest(const QUuid &sessionId)
 {
-    requestQueue.push(std::make_shared<GetHistoryMessage>());
+    Request request(std::make_shared<GetHistoryMessage>(sessionId));
+    requestQueue.push(std::move(request));
     continueRequestProcessing();
 }
 
-void TcpClientWorker::addSendChatMessageRequest(const NewChatMessageData& message)
+void TcpClientWorker::addSendChatMessageRequest(const QUuid &sessionId, const NewChatMessageData& message)
 {
-    requestQueue.push(std::make_shared<AddMessageMessage>(message));
+    Request request(std::make_shared<AddMessageMessage>(sessionId, message));
+    requestQueue.push(std::move(request));
     continueRequestProcessing();
 }
 
@@ -80,10 +85,28 @@ void TcpClientWorker::stop()
         return;
     }
     workerSocket->disconnectFromHost();
-    if(!workerSocket->waitForDisconnected(DISCONNECT_TIMEOUT)){
-        qDebug() << "Socket disconnect timeout";
+    if(workerSocket->state() == QAbstractSocket::UnconnectedState ||
+        workerSocket->waitForDisconnected(DISCONNECT_TIMEOUT)){
+        qDebug() << "Socket disconnected!";
+    }
+    else{
+        qWarning() << "Socket disconnection error";
         onSocketErrorOccured(workerSocket->error());
     }
+}
+
+void TcpClientWorker::requestNewSessionRequest(const QUuid &userId, const QString &username)
+{
+    Request request(std::make_shared<NewSessionRequestMessage>(userId, username));
+    requestQueue.push(std::move(request));
+    continueRequestProcessing();
+}
+
+void TcpClientWorker::confirmSessionRequest(const QUuid &userId, const QUuid &sessionId)
+{
+    Request request(std::make_shared<NewSessionConfirmMessage>(userId, sessionId), false);
+    requestQueue.push(std::move(request));
+    continueRequestProcessing();
 }
 
 void TcpClientWorker::onReadyRead()
@@ -109,19 +132,25 @@ void TcpClientWorker::onReadyRead()
 
 void TcpClientWorker::processTopRequest()//TODO: Process top request through event loop
 {
-    if(currentRequest != nullptr){
+    if(currentRequest.isValid()){
         qWarning() << "Request is already in process!";
         return;
     }
 
     inRequestProcessing = true;
     currentRequest = requestQueue.front();
-    qDebug() << "Message to send: " << messageTypeToString(currentRequest->getMessageType());
-    if(!TcpDataTransmitter::sendData(currentRequest->toJson().toJson(), *workerSocket.get())){
+    qDebug() << "Type of message to send: " << messageTypeToString(currentRequest.message->getMessageType());
+    if(!TcpDataTransmitter::sendData(currentRequest.message->toJson().toJson(), *workerSocket.get())){
         qWarning() << "Chat request failed";
         return;
     }
-    requestTimer.start();
+
+    if(currentRequest.waitForResponse){
+        requestTimer.start();
+    }
+    else{
+        finishRequest();
+    }
 }
 
 void TcpClientWorker::processNotification(std::shared_ptr<NotificationMessage> notitification)
@@ -150,7 +179,7 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
     qDebug() << "Received message type: " << messageTypeToString(messageType);
 
     if(messageType == MessageType::Notification){
-        auto notificationMessage = std::static_pointer_cast<NotificationMessage>(message);
+        auto notificationMessage = std::dynamic_pointer_cast<NotificationMessage>(message);
         processNotification(notificationMessage);
         return;
     }
@@ -159,21 +188,33 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
         return;
     }
 
-    if(currentRequest == nullptr){
-        qCritical() << "Invalid pointer";
+    if(!currentRequest.isValid()){
+        qCritical() << "Current request is invalid";
         return;
     }
 
-    auto currentRequestMessageType = currentRequest->getMessageType();
+    auto currentRequestMessageType = currentRequest.message->getMessageType();
     qDebug() << "Last sent message type: " << messageTypeToString(currentRequestMessageType);
     switch (messageType){
+        case MessageType::NewSessionResponse:{
+            if(currentRequestMessageType != MessageType::NewSessionRequest){
+                qWarning() << "Invalid message type";
+                break;
+            }
+            auto responseMessage = std::dynamic_pointer_cast<NewSessionResponseMessage>(message);
+
+            emit newSessionInitiated(responseMessage->getUsernameIsValid(),
+                                     responseMessage->getUserId(),
+                                     responseMessage->getSessionId());
+            break;
+        }
         case MessageType::GetHistoryResponse:{
             if(currentRequestMessageType != MessageType::GetHistory){
                 qWarning() << "Invalid message type";
                 break;
             }
 
-            auto responseMessage = std::static_pointer_cast<GetHistoryResponseMessage>(message);
+            auto responseMessage = std::dynamic_pointer_cast<GetHistoryResponseMessage>(message);
 
             emit chatHistoryReceived(responseMessage->getMessagesHistory());
             break;
@@ -184,7 +225,7 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
                 break;
             }
 
-            auto responseMessage = std::static_pointer_cast<AddMessageResponseMessage>(message);
+            auto responseMessage = std::dynamic_pointer_cast<AddMessageResponseMessage>(message);
             if(responseMessage->getResult() != Result::Success){
                 qWarning() << "Message sent failed";
             }
@@ -202,7 +243,7 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
 
 bool TcpClientWorker::isInRequestProcessing() const
 {
-    return currentRequest != nullptr;
+    return currentRequest.isValid();
 }
 
 void TcpClientWorker::continueRequestProcessing()
@@ -216,7 +257,7 @@ void TcpClientWorker::finishRequest()
 {
     requestTimer.stop();
     inRequestProcessing = false;
-    currentRequest = nullptr;
+    currentRequest = Request();
     if(requestQueue.size() != 0){
         requestQueue.pop();
     }
@@ -234,6 +275,7 @@ void TcpClientWorker::onConnected()
 
 void TcpClientWorker::onDisconnected()
 {
+    qDebug() << "TcpClientWorker::onDisconnected()";
     connected = false;
     emit stopped();
 }

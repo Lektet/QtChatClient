@@ -9,6 +9,7 @@
 #include <QLineEdit>
 #include <QTextEdit>
 #include <QPushButton>
+#include <QUuid>
 
 #include "ChatMessageData.h"
 
@@ -48,6 +49,10 @@ private:
     MessageModel* messageModel;
 
     QString username;
+
+    QUuid userId;
+    QUuid sessionId;
+
     bool disconnecting;
 
     virtual void paintEvent(QPaintEvent *event) override;
@@ -58,6 +63,9 @@ private:
 private slots:
     void onSendButtonPressed();
     void onChatMessageSentSuccess();
+
+    void onStartedSuccessfully();
+    void onNewSessionInitiated(bool initSuccess, const QUuid& receivedUserId, const QUuid& receivedSessionId);
     void onChatHistoryReceived(const std::vector<ChatMessageData> chatHistory);
     void onTcpClientStopped();
     void onChatUpdated();

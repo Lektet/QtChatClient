@@ -20,6 +20,23 @@ class TcpClientWorker : public QObject
 {
     Q_OBJECT
 
+    struct Request{
+        explicit Request(std::shared_ptr<SimpleMessage> requestMessage = nullptr,
+                         bool waitForResponseToRequest = true) :
+            message(requestMessage),
+            waitForResponse(waitForResponseToRequest)
+        {
+
+        }
+
+        bool isValid() const{
+            return message != nullptr;
+        }
+
+        std::shared_ptr<SimpleMessage> message;
+        bool waitForResponse;
+    };
+
 public:
     explicit TcpClientWorker(QObject *parent = nullptr);
 
@@ -28,11 +45,16 @@ public slots:
     void start(const QString &host, const quint16 port);
     void stop();
 
-    void addGetChatRequest();
-    void addSendChatMessageRequest(const NewChatMessageData& message);
+    void requestNewSessionRequest(const QUuid& userId, const QString& username);
+    void confirmSessionRequest(const QUuid& userId, const QUuid& sessionId);
+
+    void addGetChatRequest(const QUuid& sessionId);
+    void addSendChatMessageRequest(const QUuid& sessionId, const NewChatMessageData& message);
 
 signals:    
     void startedSucessfully();
+
+    void newSessionInitiated(bool initSuccess, const QUuid& userId, const QUuid& sessionId);
 
     void chatHistoryReceived(const std::vector<ChatMessageData> history);
     void chatMessageSentSuccess();
@@ -41,8 +63,8 @@ signals:
     void stopped();
 
 private:;
-    std::queue<std::shared_ptr<SimpleMessage>> requestQueue;
-    std::shared_ptr<SimpleMessage> currentRequest;
+    std::queue<Request> requestQueue;
+    Request currentRequest;
 
     std::unique_ptr<QTcpSocket> workerSocket;
     QTimer requestTimer;
