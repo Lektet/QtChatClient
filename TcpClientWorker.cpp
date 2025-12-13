@@ -12,8 +12,10 @@
 #include "GetHistoryResponseMessage.h"
 #include "AddMessageMessage.h"
 #include "AddMessageResponseMessage.h"
+#include "BadRequestResponseMessage.h"
 #include "NotificationMessage.h"
-#include "Result.h"
+// #include "Result.h"
+#include "ErrorInfo.h"
 #include "NotificationType.h"
 
 #include "TcpDataTransmitter.h"
@@ -153,9 +155,9 @@ void TcpClientWorker::processTopRequest()//TODO: Process top request through eve
     }
 }
 
-void TcpClientWorker::processNotification(std::shared_ptr<NotificationMessage> notitification)
+void TcpClientWorker::processNotification(const NotificationMessage &notitification)
 {
-    if(notitification->getNotificationType() == NotificationType::MessagesUpdated){
+    if(notitification.getNotificationType() == NotificationType::MessagesUpdated){
         emit chatHasBeenUpdated();
     }
 }
@@ -173,13 +175,15 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
         return;
     }
 
-    auto message = MessageUtils::createMessageFromJson(document);
-
-    auto messageType = message->getMessageType();
+    auto messageType = MessageUtils::getMessageType(document);
     qDebug() << "Received message type: " << messageTypeToString(messageType);
 
     if(messageType == MessageType::Notification){
-        auto notificationMessage = std::dynamic_pointer_cast<NotificationMessage>(message);
+        bool success = false;
+        auto notificationMessage = MessageUtils::createMessageFromJson<NotificationMessage>(document, &success);
+        if(!success){
+            return;
+        }
         processNotification(notificationMessage);
         return;
     }
@@ -201,11 +205,16 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
                 qWarning() << "Invalid message type";
                 break;
             }
-            auto responseMessage = std::dynamic_pointer_cast<NewSessionResponseMessage>(message);
+            bool success = false;
+            auto responseMessage = MessageUtils::createMessageFromJson<NewSessionResponseMessage>(document, &success);
+            if(!success){
+                qWarning() << "Error parsing received message";
+                break;
+            }
 
-            emit newSessionInitiated(responseMessage->getUsernameIsValid(),
-                                     responseMessage->getUserId(),
-                                     responseMessage->getSessionId());
+            emit newSessionInitiated(responseMessage.getUsernameIsValid(),
+                                     responseMessage.getUserId(),
+                                     responseMessage.getSessionId());
             break;
         }
         case MessageType::GetHistoryResponse:{
@@ -214,9 +223,14 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
                 break;
             }
 
-            auto responseMessage = std::dynamic_pointer_cast<GetHistoryResponseMessage>(message);
+            bool success = false;
+            auto responseMessage = MessageUtils::createMessageFromJson<GetHistoryResponseMessage>(document, &success);
+            if(!success){
+                qWarning() << "Error parsing received message";
+                break;
+            }
 
-            emit chatHistoryReceived(responseMessage->getMessagesHistory());
+            emit chatHistoryReceived(responseMessage.getMessagesHistory());
             break;
         }
         case MessageType::AddMessageResponse:{
@@ -225,14 +239,36 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
                 break;
             }
 
-            auto responseMessage = std::dynamic_pointer_cast<AddMessageResponseMessage>(message);
-            if(responseMessage->getResult() != Result::Success){
+            bool success = false;
+            auto responseMessage = MessageUtils::createMessageFromJson<AddMessageResponseMessage>(document, &success);
+            if(!success){
+                qWarning() << "Error parsing received message";
+                break;
+            }
+
+            if(!responseMessage.getResult()){
                 qWarning() << "Message sent failed";
             }
             else{
                 emit chatMessageSentSuccess();
             }
             break;
+        }
+        case MessageType::BadRequestResponse:{
+            if(currentRequestMessageType != MessageType::GetHistory &&
+                currentRequestMessageType != MessageType::AddMessage){
+                qWarning() << "Invalid message type";
+                break;
+            }
+
+            bool success = false;
+            auto responseMessage = MessageUtils::createMessageFromJson<BadRequestResponseMessage>(document, &success);
+            if(!success){
+                qWarning() << "Error parsing received message";
+                break;
+            }
+
+            emit serverReceivedBadRequest(responseMessage.getErrorInfo());
         }
         default:
             break;

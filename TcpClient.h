@@ -14,6 +14,7 @@
 class TcpClientWorker;
 
 struct NewChatMessageData;
+struct ErrorInfo;
 
 class TcpClient : public QObject
 {
@@ -44,6 +45,8 @@ signals:
     void chatHasBeenUpdated();
 
     void newSessionInitiated(bool initSuccess, const QUuid& userId, const QUuid& sessionId);
+
+    void serverReceivedBadRequest(const ErrorInfo& errorInfo);
 
 private:
     QThread* workerThread;

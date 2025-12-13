@@ -23,6 +23,8 @@ class SettingsWidget;
 
 enum class Settings;
 
+struct ErrorInfo;
+
 class MainWidget : public QWidget
 {
     Q_OBJECT
@@ -69,6 +71,7 @@ private slots:
     void onChatHistoryReceived(const std::vector<ChatMessageData> chatHistory);
     void onTcpClientStopped();
     void onChatUpdated();
+    void onServerReceivedBadRequest(const ErrorInfo& errorInfo);
 
     void onSettingsSaved(const std::set<Settings>& changedSettings);
     void onSettingsWidgetCanceled();

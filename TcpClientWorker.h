@@ -16,6 +16,8 @@ class NotificationMessage;
 struct ChatMessageData;
 struct NewChatMessageData;
 
+struct ErrorInfo;
+
 class TcpClientWorker : public QObject
 {
     Q_OBJECT
@@ -59,6 +61,7 @@ signals:
     void chatHistoryReceived(const std::vector<ChatMessageData> history);
     void chatMessageSentSuccess();
     void chatHasBeenUpdated();
+    void serverReceivedBadRequest(const ErrorInfo& errorInfo);
 
     void stopped();
 
@@ -76,7 +79,7 @@ private:;
 
     void onReadyRead();
     void processTopRequest();
-    void processNotification(std::shared_ptr<NotificationMessage> notitification);
+    void processNotification(const NotificationMessage& notitification);
     void processMessageData(const QByteArray& data, bool& responseReceived);
 
    bool isInRequestProcessing() const;

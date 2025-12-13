@@ -20,6 +20,7 @@
 #include "Settings.h"
 
 #include "NewChatMessageData.h"
+#include "ErrorInfo.h"
 
 #include <QDebug>
 
@@ -83,6 +84,8 @@ MainWidget::MainWidget(QWidget *parent)
             this, &MainWidget::onChatHistoryReceived);
     connect(tcpClient, &TcpClient::startedSuccessfully,
             this, &MainWidget::onStartedSuccessfully);
+    connect(tcpClient, &TcpClient::serverReceivedBadRequest,
+            this, &MainWidget::onServerReceivedBadRequest);
 
     connect(tcpClient, &TcpClient::stopped, this, &MainWidget::onTcpClientStopped);
     connect(tcpClient, &TcpClient::chatHasBeenUpdated, this, &MainWidget::onChatUpdated);
@@ -234,6 +237,12 @@ void MainWidget::onTcpClientStopped()
 void MainWidget::onChatUpdated()
 {
     tcpClient->addGetChatRequest(sessionId);
+}
+
+void MainWidget::onServerReceivedBadRequest(const ErrorInfo &errorInfo)
+{
+    qDebug() << "Server received bad request!";
+    qDebug() <<"Error description: " << errorInfo.errorDescription;
 }
 
 void MainWidget::onSettingsSaved(const std::set<Settings> &changedSettings)

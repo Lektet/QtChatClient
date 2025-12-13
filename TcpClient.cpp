@@ -99,6 +99,8 @@ void TcpClient::start(const QString &host, const quint16 port)
             this, &TcpClient::onWorkerStopped, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::chatHasBeenUpdated,
             this, &TcpClient::chatHasBeenUpdated, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::serverReceivedBadRequest,
+            this, &TcpClient::serverReceivedBadRequest, Qt::QueuedConnection);
 
     workerThread->start();
     QMetaObject::invokeMethod(worker,
