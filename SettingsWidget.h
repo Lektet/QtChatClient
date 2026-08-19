@@ -23,6 +23,7 @@ signals:
 
 private:
     QLineEdit* usernameField;
+    QLineEdit* passwordField;
     QLineEdit* hostField;
     QSpinBox* portPicker;
 

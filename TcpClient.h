@@ -16,6 +16,8 @@ class TcpClientWorker;
 struct NewChatMessageData;
 struct ErrorInfo;
 
+enum class UserRole;
+
 class TcpClient : public QObject
 {
     Q_OBJECT
@@ -27,7 +29,12 @@ public:
     void addSendChatMessageRequest(const QUuid& sessionId,
                                    const NewChatMessageData &message) const;
 
-    void initSession(const QUuid& userId, const QString& username);
+    void addUserRequest(const QUuid &sessionId,
+                        const QString &username,
+                        const QString &password,
+                        const UserRole role);
+
+    void initSession(const QUuid& userId, const QString& username, const QString &password);
     void confirmSession(const QUuid& userId, const QUuid& sessionId);
 
     void start(const QString& host, const quint16 port);
@@ -35,16 +42,21 @@ public:
     void restart(const QString& host, const quint16 port);
 
     bool isStarted() const;
+    bool isConnected() const;
 
 signals:
     void startedSuccessfully();
     void stopped();
+    void stoppedOnConnectionError(QAbstractSocket::SocketError errorCode);
+    void connectionErrorOccured(QAbstractSocket::SocketError errorCode);
 
     void chatHistoryReceived(const std::vector<ChatMessageData>& history);
     void chatMessageSentSuccess();
     void chatHasBeenUpdated();
+    void addUserResultReceived(bool success);
 
-    void newSessionInitiated(bool initSuccess, const QUuid& userId, const QUuid& sessionId);
+    void newSessionInitiated(const QUuid& userId, const QUuid& sessionId, const UserRole userRole);
+    void newSessionFailed(const QUuid& userId);
 
     void serverReceivedBadRequest(const ErrorInfo& errorInfo);
 
@@ -53,12 +65,16 @@ private:
     TcpClientWorker* worker;
 
     bool started;
+    bool connected;
     bool restarting;
     QString hostForRestart;
     quint16 portForRestart;
 
+    void stopWorker();
+    void stopWorkerOnConnectionError(QAbstractSocket::SocketError errorCode);
+
 private slots:
-    void onWorkerStopped();
+    void onWorkerDisconnected();
 };
 
 #endif // TCPCLIENT_H

@@ -8,12 +8,15 @@
 #include "NewSessionRequestMessage.h"
 #include "NewSessionResponseMessage.h"
 #include "NewSessionConfirmMessage.h"
+#include "NewSessionFailedResponseMessage.h"
 #include "GetHistoryMessage.h"
 #include "GetHistoryResponseMessage.h"
 #include "AddMessageMessage.h"
 #include "AddMessageResponseMessage.h"
 #include "BadRequestResponseMessage.h"
 #include "NotificationMessage.h"
+#include "AddUserMessage.h"
+#include "AddUserResponseMessage.h"
 // #include "Result.h"
 #include "ErrorInfo.h"
 #include "NotificationType.h"
@@ -30,7 +33,7 @@ const int DISCONNECT_TIMEOUT = 5000;
 
 TcpClientWorker::TcpClientWorker(QObject *parent)
     : QObject{parent},
-      currentRequest(nullptr),
+      lastSentRequest(nullptr),
       workerSocket(nullptr),
       inRequestProcessing(false),
       connected(false)
@@ -68,7 +71,14 @@ void TcpClientWorker::addSendChatMessageRequest(const QUuid &sessionId, const Ne
     continueRequestProcessing();
 }
 
-void TcpClientWorker::start(const QString &host, const quint16 port)
+void TcpClientWorker::addUserRequest(const QUuid &sessionId, const QString &username, const QString &password, const UserRole role)
+{
+    Request request(std::make_shared<AddUserMessage>(sessionId, username, password, role));
+    requestQueue.push(std::move(request));
+    continueRequestProcessing();
+}
+
+void TcpClientWorker::connectToServer(const QString &host, const quint16 port)
 {
     Q_ASSERT(workerSocket != nullptr);
     if(workerSocket->state() != QTcpSocket::UnconnectedState){
@@ -79,7 +89,7 @@ void TcpClientWorker::start(const QString &host, const quint16 port)
     workerSocket->connectToHost(host, port);
 }
 
-void TcpClientWorker::stop()
+void TcpClientWorker::disconnect()
 {
     Q_ASSERT(workerSocket != nullptr);
     if(workerSocket->state() == QTcpSocket::UnconnectedState){
@@ -97,9 +107,9 @@ void TcpClientWorker::stop()
     }
 }
 
-void TcpClientWorker::requestNewSessionRequest(const QUuid &userId, const QString &username)
+void TcpClientWorker::requestNewSessionRequest(const QUuid &userId, const QString &username, const QString& password)
 {
-    Request request(std::make_shared<NewSessionRequestMessage>(userId, username));
+    Request request(std::make_shared<NewSessionRequestMessage>(userId, username, password));
     requestQueue.push(std::move(request));
     continueRequestProcessing();
 }
@@ -115,39 +125,39 @@ void TcpClientWorker::onReadyRead()
 {
     auto receivedData = TcpDataTransmitter::receiveData(*workerSocket.get());
 
-    bool currentRequestProcessed = false;
+    bool responseToLastRequestReceived = false;
     for(auto& data : receivedData){
         bool responseReceived = false;
         processMessageData(data, responseReceived);
-        if(currentRequestProcessed == responseReceived == true){
+        if(responseToLastRequestReceived == responseReceived == true){
             qWarning() << "Inapropriate message received";
         }
         else if(responseReceived){
-            currentRequestProcessed = true;
+            responseToLastRequestReceived = true;
         }
     }
 
-    if(currentRequestProcessed){
+    if(responseToLastRequestReceived){
         finishRequest();
     }
 }
 
 void TcpClientWorker::processTopRequest()//TODO: Process top request through event loop
 {
-    if(currentRequest.isValid()){
+    if(lastSentRequest.isValid()){
         qWarning() << "Request is already in process!";
         return;
     }
 
     inRequestProcessing = true;
-    currentRequest = requestQueue.front();
-    qDebug() << "Type of message to send: " << messageTypeToString(currentRequest.message->getMessageType());
-    if(!TcpDataTransmitter::sendData(currentRequest.message->toJson().toJson(), *workerSocket.get())){
+    lastSentRequest = requestQueue.front();
+    qDebug() << "Type of message to send: " << messageTypeToString(lastSentRequest.message->getMessageType());
+    if(!TcpDataTransmitter::sendData(lastSentRequest.message->toJson().toJson(), *workerSocket.get())){
         qWarning() << "Chat request failed";
         return;
     }
 
-    if(currentRequest.waitForResponse){
+    if(lastSentRequest.waitForResponse){
         requestTimer.start();
     }
     else{
@@ -192,12 +202,12 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
         return;
     }
 
-    if(!currentRequest.isValid()){
+    if(!lastSentRequest.isValid()){
         qCritical() << "Current request is invalid";
         return;
     }
 
-    auto currentRequestMessageType = currentRequest.message->getMessageType();
+    auto currentRequestMessageType = lastSentRequest.message->getMessageType();
     qDebug() << "Last sent message type: " << messageTypeToString(currentRequestMessageType);
     switch (messageType){
         case MessageType::NewSessionResponse:{
@@ -206,15 +216,30 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
                 break;
             }
             bool success = false;
-            auto responseMessage = MessageUtils::createMessageFromJson<NewSessionResponseMessage>(document, &success);
+            auto responseMessage = MessageUtils::createMessageFromJson<NewSessionSuccessResponseMessage>(document, &success);
             if(!success){
                 qWarning() << "Error parsing received message";
                 break;
             }
 
-            emit newSessionInitiated(responseMessage.getUsernameIsValid(),
-                                     responseMessage.getUserId(),
-                                     responseMessage.getSessionId());
+            emit newSessionInitiated(responseMessage.getUserId(),
+                                     responseMessage.getSessionId(),
+                                     responseMessage.getUserRole());
+            break;
+        }
+        case MessageType::NewSessionFailedResponse:{
+            if(currentRequestMessageType != MessageType::NewSessionRequest){
+                qWarning() << "Invalid message type";
+                break;
+            }
+            bool success = false;
+            auto responseMessage = MessageUtils::createMessageFromJson<NewSessionFailedResponseMessage>(document, &success);
+            if(!success){
+                qWarning() << "Error parsing received message";
+                break;
+            }
+
+            emit newSessionFailed(responseMessage.getUserId());
             break;
         }
         case MessageType::GetHistoryResponse:{
@@ -247,11 +272,27 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
             }
 
             if(!responseMessage.getResult()){
-                qWarning() << "Message sent failed";
+                qWarning() << "Message send failed";
             }
             else{
                 emit chatMessageSentSuccess();
             }
+            break;
+        }
+        case MessageType::AddUserResponse:{
+            if(currentRequestMessageType != MessageType::AddUserResponse){
+                qWarning() << "Invalid message type";
+                break;
+            }
+
+            bool success = false;
+            auto responseMessage = MessageUtils::createMessageFromJson<AddUserResponseMessage>(document, &success);
+            if(!success){
+                qWarning() << "Error parsing received message";
+                break;
+            }
+
+            emit addUserResultReceived(responseMessage.getResult());
             break;
         }
         case MessageType::BadRequestResponse:{
@@ -279,7 +320,7 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
 
 bool TcpClientWorker::isInRequestProcessing() const
 {
-    return currentRequest.isValid();
+    return lastSentRequest.isValid();
 }
 
 void TcpClientWorker::continueRequestProcessing()
@@ -293,7 +334,7 @@ void TcpClientWorker::finishRequest()
 {
     requestTimer.stop();
     inRequestProcessing = false;
-    currentRequest = Request();
+    lastSentRequest = Request();
     if(requestQueue.size() != 0){
         requestQueue.pop();
     }
@@ -305,20 +346,21 @@ void TcpClientWorker::finishRequest()
 
 void TcpClientWorker::onConnected()
 {
-    connected = true;
-    emit startedSucessfully();
+    emit connectedSucessfully();
 }
 
 void TcpClientWorker::onDisconnected()
 {
     qDebug() << "TcpClientWorker::onDisconnected()";
     connected = false;
-    emit stopped();
+    emit disconnected();
 }
 
 void TcpClientWorker::onSocketErrorOccured(QAbstractSocket::SocketError socketError)
 {
+    qDebug() << "TcpClientWorker::onSocketErrorOccured()";
     qWarning() << "Socket error: " << socketError;
     qWarning() << "Socket error description: " << workerSocket->errorString();
-    if(!connected) emit stopped();
+
+    emit connectionErrorOccured(socketError);
 }

@@ -11,9 +11,14 @@
 
 #include "Settings.h"
 
+//TODO: Declare once
+const int MAX_USERNAME_LENGTH = 64;
+const int MAX_PASSWORD_LENGTH = 64;
+
 SettingsWidget::SettingsWidget(QWidget *parent)
     : QWidget{parent},
     usernameField(new QLineEdit()),
+    passwordField(new QLineEdit()),
     hostField(new QLineEdit()),
     portPicker(new QSpinBox()),
     saved(false)
@@ -22,7 +27,18 @@ SettingsWidget::SettingsWidget(QWidget *parent)
     
     auto usernameLabel = new QLabel(tr("Username: "));
     widgetLayout->addWidget(usernameLabel);
+    QRegularExpression usernameRegExp(QString("^(\\w{1,%1})$").arg(MAX_USERNAME_LENGTH));
+    auto usernameValidator = new QRegularExpressionValidator(usernameRegExp, usernameField);
+    usernameField->setValidator(usernameValidator);
     widgetLayout->addWidget(usernameField);
+
+    auto passwordLabel = new QLabel(tr("Password: "));
+    widgetLayout->addWidget(passwordLabel);
+    passwordField->setEchoMode(QLineEdit::EchoMode::Password);
+    QRegularExpression passwordRegExp(QString("^(\\w{1,%1})$").arg(MAX_PASSWORD_LENGTH));
+    auto passwordValidator = new QRegularExpressionValidator(passwordRegExp, passwordField);
+    passwordField->setValidator(passwordValidator);
+    widgetLayout->addWidget(passwordField);
     
     auto hostPortLayout = new QHBoxLayout();
     
@@ -79,9 +95,11 @@ void SettingsWidget::showEvent(QShowEvent *event)
 {
     QSettings settings;
     auto username = settings.value("username").toString();
+    auto password = settings.value("password").toString();
     auto host = settings.value("serverHost").toString();
     auto port = settings.value("serverPort").toInt();
     usernameField->setText(username);
+    passwordField->setText(password);
     hostField->setText(host);
     portPicker->setValue(port);
 
@@ -92,10 +110,12 @@ void SettingsWidget::onSaveButtonPressed()
 {
     QSettings settings;
     auto oldUsername = settings.value("username").toString();
+    auto oldPassword = settings.value("password").toString();
     auto oldServerHost = settings.value("serverHost").toString();
     auto oldServerPort = settings.value("serverPort").toInt();
 
     auto newUsername = usernameField->text();
+    auto newPassword = passwordField->text();
     auto newServerHost = hostField->text();
     auto newServerPort = portPicker->text().toInt();
 
@@ -103,6 +123,10 @@ void SettingsWidget::onSaveButtonPressed()
     if(oldUsername != newUsername){
         changedSettings.emplace(Settings::Username);
         settings.setValue("username", newUsername);
+    }
+    if(oldPassword != newPassword){
+        changedSettings.emplace(Settings::Password);
+        settings.setValue("password", newPassword);
     }
     if(oldServerHost != newServerHost){
         changedSettings.emplace(Settings::Host);

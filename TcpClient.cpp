@@ -14,6 +14,7 @@ TcpClient::TcpClient(QObject *parent)
     workerThread(nullptr),
     worker(nullptr),
     started(false),
+    connected(false),
     restarting(false)
 {
     qRegisterMetaType<NewChatMessageData>();
@@ -51,6 +52,25 @@ void TcpClient::addSendChatMessageRequest(const QUuid &sessionId, const NewChatM
                               Q_ARG(NewChatMessageData, message));
 }
 
+void TcpClient::addUserRequest(const QUuid &sessionId,
+                               const QString &username,
+                               const QString &password,
+                               const UserRole role)
+{
+    if(!started){
+        qWarning() << "Client was not started!";
+        return;
+    }
+
+    QMetaObject::invokeMethod(worker,
+                              "addUserRequest",
+                              Qt::QueuedConnection,
+                              Q_ARG(QUuid, sessionId),
+                              Q_ARG(QString, username),
+                              Q_ARG(QString, password),
+                              Q_ARG(UserRole, role));
+}
+
 void TcpClient::confirmSession(const QUuid &userId, const QUuid &sessionId)
 {
     if(!started){
@@ -65,7 +85,7 @@ void TcpClient::confirmSession(const QUuid &userId, const QUuid &sessionId)
                               Q_ARG(QUuid, sessionId));
 }
 
-void TcpClient::initSession(const QUuid &userId, const QString &username)
+void TcpClient::initSession(const QUuid &userId, const QString &username, const QString &password)
 {
     if(!started){
         qWarning() << "Client was not started!";
@@ -76,7 +96,8 @@ void TcpClient::initSession(const QUuid &userId, const QString &username)
                               "requestNewSessionRequest",
                               Qt::QueuedConnection,
                               Q_ARG(QUuid, userId),
-                              Q_ARG(QString, username));
+                              Q_ARG(QString, username),
+                              Q_ARG(QString, password));
 }
 
 void TcpClient::start(const QString &host, const quint16 port)
@@ -89,29 +110,41 @@ void TcpClient::start(const QString &host, const quint16 port)
     worker->moveToThread(workerThread);
     connect(worker, &TcpClientWorker::newSessionInitiated,
             this, &TcpClient::newSessionInitiated, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::newSessionFailed,
+            this, &TcpClient::newSessionFailed, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::chatHistoryReceived,
             this, &TcpClient::chatHistoryReceived, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::chatMessageSentSuccess,
             this, &TcpClient::chatMessageSentSuccess, Qt::QueuedConnection);
-    connect(worker, &TcpClientWorker::startedSucessfully,
-            this, &TcpClient::startedSuccessfully, Qt::QueuedConnection);
-    connect(worker, &TcpClientWorker::stopped,
-            this, &TcpClient::onWorkerStopped, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::connectedSucessfully,
+            this, [this](){
+                    connected = true;
+                    emit startedSuccessfully();
+            }, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::disconnected,
+            this, &TcpClient::onWorkerDisconnected, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::chatHasBeenUpdated,
             this, &TcpClient::chatHasBeenUpdated, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::addUserResultReceived,
+            this, &TcpClient::addUserResultReceived, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::serverReceivedBadRequest,
             this, &TcpClient::serverReceivedBadRequest, Qt::QueuedConnection);
+    // connect(worker, &TcpClientWorker::connectionErrorOccured,
+    //         this, &TcpClient::connectionErrorOccured, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::connectionErrorOccured,
+            this, &TcpClient::stopWorkerOnConnectionError, Qt::QueuedConnection);
 
     workerThread->start();
     QMetaObject::invokeMethod(worker,
                               &TcpClientWorker::init,
                               Qt::QueuedConnection);
     QMetaObject::invokeMethod(worker,
-                              "start",
+                              "connectToServer",
                               Qt::QueuedConnection,
                               Q_ARG(QString, host),
                               Q_ARG(quint16, port));
 }
+
 
 void TcpClient::stop()
 {
@@ -121,7 +154,7 @@ void TcpClient::stop()
     }
 
     QMetaObject::invokeMethod(worker,
-                              &TcpClientWorker::stop,
+                              &TcpClientWorker::disconnect,
                               Qt::QueuedConnection);
 
 }
@@ -139,10 +172,13 @@ bool TcpClient::isStarted() const
     return started;
 }
 
-void TcpClient::onWorkerStopped()
+bool TcpClient::isConnected() const
 {
-    qDebug() << "onWorkerStopped()";
+    return connected;
+}
 
+void TcpClient::stopWorker()
+{
     if(!started){
         qCritical() << "Client was not started";
         return;
@@ -152,8 +188,26 @@ void TcpClient::onWorkerStopped()
     workerThread->quit();
     workerThread->wait();
 
+    //TODO: Remove thread and worker only on quit?
     worker->deleteLater();
     workerThread->deleteLater();
+
+}
+
+void TcpClient::stopWorkerOnConnectionError(QAbstractSocket::SocketError errorCode)
+{
+    stopWorker();
+
+    emit stoppedOnConnectionError(errorCode);
+}
+
+void TcpClient::onWorkerDisconnected()
+{
+    qDebug() << "onWorkerStopped()";
+
+    connected = false;
+
+    stopWorker();
 
     if(!restarting){
         emit stopped();

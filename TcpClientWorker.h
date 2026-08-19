@@ -18,6 +18,8 @@ struct NewChatMessageData;
 
 struct ErrorInfo;
 
+enum class UserRole;
+
 class TcpClientWorker : public QObject
 {
     Q_OBJECT
@@ -44,30 +46,35 @@ public:
 
 public slots:
     void init();
-    void start(const QString &host, const quint16 port);
-    void stop();
+    void connectToServer(const QString &host, const quint16 port);
+    void disconnect();
 
-    void requestNewSessionRequest(const QUuid& userId, const QString& username);
+    void requestNewSessionRequest(const QUuid& userId, const QString& username, const QString& password);
     void confirmSessionRequest(const QUuid& userId, const QUuid& sessionId);
 
     void addGetChatRequest(const QUuid& sessionId);
     void addSendChatMessageRequest(const QUuid& sessionId, const NewChatMessageData& message);
 
-signals:    
-    void startedSucessfully();
+    void addUserRequest(const QUuid &sessionId, const QString &username, const QString &password, const UserRole role);
 
-    void newSessionInitiated(bool initSuccess, const QUuid& userId, const QUuid& sessionId);
+signals:
+    void connectedSucessfully();
+    void connectionErrorOccured(QAbstractSocket::SocketError errorCode);
+
+    void newSessionInitiated(const QUuid& userId, const QUuid& sessionId, const UserRole userRole);
+    void newSessionFailed(const QUuid& userId);
 
     void chatHistoryReceived(const std::vector<ChatMessageData> history);
     void chatMessageSentSuccess();
     void chatHasBeenUpdated();
+    void addUserResultReceived(bool success);
     void serverReceivedBadRequest(const ErrorInfo& errorInfo);
 
-    void stopped();
+    void disconnected();
 
-private:;
+private:
     std::queue<Request> requestQueue;
-    Request currentRequest;
+    Request lastSentRequest;
 
     std::unique_ptr<QTcpSocket> workerSocket;
     QTimer requestTimer;
