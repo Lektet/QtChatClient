@@ -4,6 +4,16 @@
 <context>
     <name>MainWidget</name>
     <message>
+        <location filename="MainWidget.cpp" line="60"/>
+        <source>Messsages</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="MainWidget.cpp" line="61"/>
+        <source>User Managment</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="MainWidget.cpp" line="66"/>
         <source>Message empty!</source>
         <translation type="unfinished"></translation>
@@ -16,6 +26,16 @@
     <message>
         <location filename="MainWidget.cpp" line="188"/>
         <source>Message:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="MainWidget.cpp" line="236"/>
+        <source>Connection error</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="MainWidget.cpp" line="236"/>
+        <source>Disconnected by server</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -38,26 +58,6 @@
     <message>
         <location filename="MainWidget.cpp" line="270"/>
         <source>Invalid credentials</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="MainWidget.cpp" line="236"/>
-        <source>Connection error</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="MainWidget.cpp" line="60"/>
-        <source>Messsages</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="MainWidget.cpp" line="61"/>
-        <source>User Managment</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="MainWidget.cpp" line="236"/>
-        <source>Disconnected by server</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
