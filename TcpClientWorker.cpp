@@ -6,17 +6,13 @@
 #include "MessageType.h"
 #include "MessageUtils.h"
 #include "NewSessionRequestMessage.h"
-#include "NewSessionSuccessResponseMessage.h"
+#include "NewSessionResponseMessage.h"
 #include "NewSessionConfirmMessage.h"
-#include "NewSessionFailedResponseMessage.h"
 #include "GetHistoryMessage.h"
 #include "GetHistoryResponseMessage.h"
 #include "AddMessageMessage.h"
-#include "AddMessageResponseMessage.h"
-#include "BadRequestResponseMessage.h"
 #include "NotificationMessage.h"
 #include "AddUserMessage.h"
-#include "AddUserResponseMessage.h"
 // #include "Result.h"
 #include "ErrorInfo.h"
 #include "NotificationType.h"
@@ -216,32 +212,37 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
                 break;
             }
             bool success = false;
-            auto responseMessage = MessageUtils::createMessageFromJson<NewSessionSuccessResponseMessage>(document, &success);
+            auto responseMessage = MessageUtils::createMessageFromJson<NewSessionResponseMessage>(document, &success);
             if(!success){
                 qWarning() << "Error parsing received message";
                 break;
             }
 
-            emit newSessionInitiated(responseMessage.getUserId(),
-                                     responseMessage.getSessionId(),
-                                     responseMessage.getUserRole());
+            bool sessionInitiated = responseMessage.getErrorInfo().errorCode == ErrorCode::NoError;
+            if(sessionInitiated){
+                emit newSessionInitiated(responseMessage.getUserId(),
+                                         responseMessage.getSessionId(),
+                                         responseMessage.getUserRole());
+            }
+            else{
+                emit newSessionFailed(responseMessage.getUserId());
+            }
             break;
         }
-        case MessageType::NewSessionFailedResponse:{
-            if(currentRequestMessageType != MessageType::NewSessionRequest){
-                qWarning() << "Invalid message type";
-                break;
-            }
-            bool success = false;
-            auto responseMessage = MessageUtils::createMessageFromJson<NewSessionFailedResponseMessage>(document, &success);
-            if(!success){
-                qWarning() << "Error parsing received message";
-                break;
-            }
+        // case MessageType::NewSessionFailedResponse:{
+        //     if(currentRequestMessageType != MessageType::NewSessionRequest){
+        //         qWarning() << "Invalid message type";
+        //         break;
+        //     }
+        //     bool success = false;
+        //     auto responseMessage = MessageUtils::createMessageFromJson<NewSessionFailedResponseMessage>(document, &success);
+        //     if(!success){
+        //         qWarning() << "Error parsing received message";
+        //         break;
+        //     }
 
-            emit newSessionFailed(responseMessage.getUserId());
-            break;
-        }
+        //     break;
+        // }
         case MessageType::GetHistoryResponse:{
             if(currentRequestMessageType != MessageType::GetHistory){
                 qWarning() << "Invalid message type";
