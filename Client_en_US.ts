@@ -14,69 +14,69 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="66"/>
+        <location filename="MainWidget.cpp" line="67"/>
         <source>Message empty!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="68"/>
+        <location filename="MainWidget.cpp" line="69"/>
         <source>sendButton</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="188"/>
+        <location filename="MainWidget.cpp" line="189"/>
         <source>Message:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="236"/>
+        <location filename="MainWidget.cpp" line="241"/>
         <source>Connection error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="236"/>
+        <location filename="MainWidget.cpp" line="241"/>
         <source>Disconnected by server</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="245"/>
-        <location filename="MainWidget.cpp" line="251"/>
+        <location filename="MainWidget.cpp" line="250"/>
+        <location filename="MainWidget.cpp" line="256"/>
         <source>Login error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="245"/>
-        <location filename="MainWidget.cpp" line="251"/>
+        <location filename="MainWidget.cpp" line="250"/>
+        <location filename="MainWidget.cpp" line="256"/>
         <source>Invalid login data received</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="270"/>
+        <location filename="MainWidget.cpp" line="276"/>
         <source>Login failed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="270"/>
+        <location filename="MainWidget.cpp" line="276"/>
         <source>Invalid credentials</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="344"/>
+        <location filename="MainWidget.cpp" line="350"/>
         <source>User created</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="344"/>
+        <location filename="MainWidget.cpp" line="350"/>
         <source>New user successfully created!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="347"/>
+        <location filename="MainWidget.cpp" line="353"/>
         <source>User not created</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="347"/>
+        <location filename="MainWidget.cpp" line="353"/>
         <source>Failed to create new user!</source>
         <translation type="unfinished"></translation>
     </message>
@@ -93,32 +93,32 @@
 <context>
     <name>SettingsWidget</name>
     <message>
-        <location filename="SettingsWidget.cpp" line="28"/>
+        <location filename="SettingsWidget.cpp" line="26"/>
         <source>Username: </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="SettingsWidget.cpp" line="35"/>
+        <location filename="SettingsWidget.cpp" line="33"/>
         <source>Password: </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="SettingsWidget.cpp" line="47"/>
+        <location filename="SettingsWidget.cpp" line="45"/>
         <source>Host:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="SettingsWidget.cpp" line="58"/>
+        <location filename="SettingsWidget.cpp" line="56"/>
         <source>Port:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="SettingsWidget.cpp" line="70"/>
+        <location filename="SettingsWidget.cpp" line="68"/>
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="SettingsWidget.cpp" line="71"/>
+        <location filename="SettingsWidget.cpp" line="69"/>
         <source>Save</source>
         <translation type="unfinished"></translation>
     </message>

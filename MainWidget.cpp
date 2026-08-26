@@ -63,6 +63,7 @@ MainWidget::MainWidget(QWidget *parent)
     chatHistoryView(new QListView()),
     messageItemDelegate(new MessageItemDelegate(this)),
     messagesViewer(new MessagesViewer(this)),
+    sendMessageWidget(new QWidget()),
     messageErrorLabel(new QLabel(tr("Message empty!"))),
     messageField(new QTextEdit()),
     sendButton(new QPushButton(tr("sendButton"))),
@@ -189,11 +190,15 @@ void MainWidget::setupLayout()
     messageLabelsLayout->addWidget(messageLabel);
     messageLabelsLayout->addWidget(messageErrorLabel);
 
-    messagesWidgetContentLayout->addLayout(messageLabelsLayout);
 
-    messagesWidgetContentLayout->addWidget(messageField);
+    auto sendMessageWidgetLayout = new QVBoxLayout();
+    sendMessageWidgetLayout->addLayout(messageLabelsLayout);
+    sendMessageWidgetLayout->addWidget(messageField);
+    sendMessageWidgetLayout->addWidget(sendButton);
+    sendMessageWidgetLayout->setContentsMargins(0,0,0,0);
+    sendMessageWidget->setLayout(sendMessageWidgetLayout);
 
-    messagesWidgetContentLayout->addWidget(sendButton);
+    messagesWidgetContentLayout->addWidget(sendMessageWidget);
 
     messagesWidget->setLayout(messagesWidgetContentLayout);
 
@@ -259,6 +264,7 @@ void MainWidget::onNewSessionInitiated(const QUuid &receivedUserId, const QUuid 
     tcpClient->addGetChatRequest(sessionId);
 
     userManagmentAction->setDisabled(userRole != UserRole::Admin);
+    sendMessageWidget->setVisible(userRole != UserRole::Guest);
 }
 
 void MainWidget::onNewSessionFailed(const QUuid &receivedUserId)

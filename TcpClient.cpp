@@ -188,10 +188,8 @@ void TcpClient::stopWorker()
     workerThread->quit();
     workerThread->wait();
 
-    //TODO: Remove thread and worker only on quit?
     worker->deleteLater();
     workerThread->deleteLater();
-
 }
 
 void TcpClient::stopWorkerOnConnectionError(QAbstractSocket::SocketError errorCode)

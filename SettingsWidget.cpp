@@ -9,11 +9,9 @@
 #include <QSettings>
 #include <QMessageBox>
 
-#include "Settings.h"
+#include "Constants.h"
 
-//TODO: Declare once
-const int MAX_USERNAME_LENGTH = 64;
-const int MAX_PASSWORD_LENGTH = 64;
+#include "Settings.h"
 
 SettingsWidget::SettingsWidget(QWidget *parent)
     : QWidget{parent},
@@ -27,7 +25,7 @@ SettingsWidget::SettingsWidget(QWidget *parent)
     
     auto usernameLabel = new QLabel(tr("Username: "));
     widgetLayout->addWidget(usernameLabel);
-    QRegularExpression usernameRegExp(QString("^(\\w{1,%1})$").arg(MAX_USERNAME_LENGTH));
+    QRegularExpression usernameRegExp(QString("^(\\w{0,%1})$").arg(Constants::USERNAME_MAX_LENGTH));
     auto usernameValidator = new QRegularExpressionValidator(usernameRegExp, usernameField);
     usernameField->setValidator(usernameValidator);
     widgetLayout->addWidget(usernameField);
@@ -35,7 +33,7 @@ SettingsWidget::SettingsWidget(QWidget *parent)
     auto passwordLabel = new QLabel(tr("Password: "));
     widgetLayout->addWidget(passwordLabel);
     passwordField->setEchoMode(QLineEdit::EchoMode::Password);
-    QRegularExpression passwordRegExp(QString("^(\\w{1,%1})$").arg(MAX_PASSWORD_LENGTH));
+    QRegularExpression passwordRegExp(QString("^(\\w{1,%1})$").arg(Constants::PASSWORD_MAX_LENGTH));
     auto passwordValidator = new QRegularExpressionValidator(passwordRegExp, passwordField);
     passwordField->setValidator(passwordValidator);
     widgetLayout->addWidget(passwordField);

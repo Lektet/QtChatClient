@@ -56,6 +56,7 @@ private:
     QListView* chatHistoryView;
     MessageItemDelegate* messageItemDelegate;
     MessagesViewer* messagesViewer;
+    QWidget* sendMessageWidget;
     QLabel* messageErrorLabel;
     QTextEdit* messageField;
     QPushButton* sendButton;
