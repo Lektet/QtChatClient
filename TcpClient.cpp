@@ -25,7 +25,7 @@ TcpClient::~TcpClient()
 
 }
 
-void TcpClient::addGetChatRequest(const QUuid &sessionId) const
+void TcpClient::requestChatMessages(const QUuid &sessionId) const
 {
     if(!started){
         qCritical() << "Client is not started!";
@@ -33,12 +33,12 @@ void TcpClient::addGetChatRequest(const QUuid &sessionId) const
     }
 
     QMetaObject::invokeMethod(worker,
-                              "addGetChatRequest",
+                              "requestChatMessages",
                               Qt::QueuedConnection,
                               Q_ARG(QUuid, sessionId));
 }
 
-void TcpClient::addSendChatMessageRequest(const QUuid &sessionId, const NewChatMessageData &message) const
+void TcpClient::addChatMessage(const QUuid &sessionId, const NewChatMessageData &message) const
 {
     if(!started){
         qWarning() << "Client was not started!";
@@ -46,13 +46,13 @@ void TcpClient::addSendChatMessageRequest(const QUuid &sessionId, const NewChatM
     }
 
     QMetaObject::invokeMethod(worker,
-                              "addSendChatMessageRequest",
+                              "requestAddChatMessage",
                               Qt::QueuedConnection,
                               Q_ARG(QUuid, sessionId),
                               Q_ARG(NewChatMessageData, message));
 }
 
-void TcpClient::addUserRequest(const QUuid &sessionId,
+void TcpClient::addUser(const QUuid &sessionId,
                                const QString &username,
                                const QString &password,
                                const UserRole role)
@@ -63,7 +63,7 @@ void TcpClient::addUserRequest(const QUuid &sessionId,
     }
 
     QMetaObject::invokeMethod(worker,
-                              "addUserRequest",
+                              "requestAddUser",
                               Qt::QueuedConnection,
                               Q_ARG(QUuid, sessionId),
                               Q_ARG(QString, username),
@@ -79,7 +79,7 @@ void TcpClient::confirmSession(const QUuid &userId, const QUuid &sessionId)
     }
 
     QMetaObject::invokeMethod(worker,
-                              "confirmSessionRequest",
+                              "requestConfirmSession",
                               Qt::QueuedConnection,
                               Q_ARG(QUuid, userId),
                               Q_ARG(QUuid, sessionId));
@@ -93,7 +93,7 @@ void TcpClient::initSession(const QUuid &userId, const QString &username, const 
     }
 
     QMetaObject::invokeMethod(worker,
-                              "requestNewSessionRequest",
+                              "requestNewSession",
                               Qt::QueuedConnection,
                               Q_ARG(QUuid, userId),
                               Q_ARG(QString, username),
@@ -112,10 +112,10 @@ void TcpClient::start(const QString &host, const quint16 port)
             this, &TcpClient::newSessionInitiated, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::newSessionFailed,
             this, &TcpClient::newSessionFailed, Qt::QueuedConnection);
-    connect(worker, &TcpClientWorker::chatHistoryReceived,
-            this, &TcpClient::chatHistoryReceived, Qt::QueuedConnection);
-    connect(worker, &TcpClientWorker::chatMessageSentSuccess,
-            this, &TcpClient::chatMessageSentSuccess, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::chatMessagesReceived,
+            this, &TcpClient::chatMessagesReceived, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::addChatMessageResultReceived,
+            this, &TcpClient::addChatMessageResultReceived, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::connectedSucessfully,
             this, [this](){
                     connected = true;

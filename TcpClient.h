@@ -25,11 +25,11 @@ public:
     explicit TcpClient(QObject *parent = nullptr);
     ~TcpClient();
 
-    void addGetChatRequest(const QUuid& sessionId) const;
-    void addSendChatMessageRequest(const QUuid& sessionId,
+    void requestChatMessages(const QUuid& sessionId) const;
+    void addChatMessage(const QUuid& sessionId,
                                    const NewChatMessageData &message) const;
 
-    void addUserRequest(const QUuid &sessionId,
+    void addUser(const QUuid &sessionId,
                         const QString &username,
                         const QString &password,
                         const UserRole role);
@@ -50,8 +50,8 @@ signals:
     void stoppedOnConnectionError(QAbstractSocket::SocketError errorCode);
     void connectionErrorOccured(QAbstractSocket::SocketError errorCode);
 
-    void chatHistoryReceived(const std::vector<ChatMessageData>& history);
-    void chatMessageSentSuccess();
+    void chatMessagesReceived(const std::vector<ChatMessageData>& history);
+    void addChatMessageResultReceived(bool success);
     void chatHasBeenUpdated();
     void addUserResultReceived(bool success);
 

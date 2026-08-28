@@ -94,10 +94,10 @@ MainWidget::MainWidget(QWidget *parent)
             this, &MainWidget::onNewSessionInitiated);
     connect(tcpClient, &TcpClient::newSessionFailed,
             this, &MainWidget::onNewSessionFailed);
-    connect(tcpClient, &TcpClient::chatMessageSentSuccess,
-            this, &MainWidget::onChatMessageSentSuccess);
-    connect(tcpClient, &TcpClient::chatHistoryReceived,
-            this, &MainWidget::onChatHistoryReceived);
+    connect(tcpClient, &TcpClient::addChatMessageResultReceived,
+            this, &MainWidget::onAddChatMessageResultReceived);
+    connect(tcpClient, &TcpClient::chatMessagesReceived,
+            this, &MainWidget::onChatMessagesReceived);
     connect(tcpClient, &TcpClient::startedSuccessfully,
             this, &MainWidget::onStartedSuccessfully);
     connect(tcpClient, &TcpClient::serverReceivedBadRequest,
@@ -221,12 +221,17 @@ void MainWidget::onSendButtonPressed()
     }
 
     NewChatMessageData message(username, messageField->toPlainText());
-    tcpClient->addSendChatMessageRequest(sessionId, message);
+    tcpClient->addChatMessage(sessionId, message);
 }
 
-void MainWidget::onChatMessageSentSuccess()
+void MainWidget::onAddChatMessageResultReceived(bool success)
 {
-    qDebug() << "Chat message sent successfully";
+    if(success){
+        qDebug() << "Chat message sent successfully";
+    }
+    else{
+        qWarning() << "Chat message sent failed";
+    }
 }
 
 void MainWidget::onStartedSuccessfully()
@@ -261,7 +266,7 @@ void MainWidget::onNewSessionInitiated(const QUuid &receivedUserId, const QUuid 
     sessionId = receivedSessionId;
 
     tcpClient->confirmSession(userId, sessionId);
-    tcpClient->addGetChatRequest(sessionId);
+    tcpClient->requestChatMessages(sessionId);
 
     userManagmentAction->setDisabled(userRole != UserRole::Admin);
     sendMessageWidget->setVisible(userRole != UserRole::Guest);
@@ -278,7 +283,7 @@ void MainWidget::onNewSessionFailed(const QUuid &receivedUserId)
     }
 }
 
-void MainWidget::onChatHistoryReceived(const std::vector<ChatMessageData> chatHistory)
+void MainWidget::onChatMessagesReceived(const std::vector<ChatMessageData> chatHistory)
 {
     messageModel->setMessages(std::move(chatHistory));
     messagesViewer->setDataFromModel(messageModel);
@@ -295,7 +300,7 @@ void MainWidget::onTcpClientStopped()
 
 void MainWidget::onChatUpdated()
 {
-    tcpClient->addGetChatRequest(sessionId);
+    tcpClient->requestChatMessages(sessionId);
 }
 
 void MainWidget::onServerReceivedBadRequest(const ErrorInfo &errorInfo)
@@ -341,7 +346,7 @@ void MainWidget::onSettingsWidgetCanceled()
 
 void MainWidget::onNewUserSubmitted(const QString &username, const QString &password, const UserRole role)
 {
-    tcpClient->addUserRequest(sessionId, username, password, role);
+    tcpClient->addUser(sessionId, username, password, role);
 }
 
 void MainWidget::onAddUserResultReceived(bool success)

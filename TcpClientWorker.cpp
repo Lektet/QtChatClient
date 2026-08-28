@@ -8,8 +8,8 @@
 #include "NewSessionRequestMessage.h"
 #include "NewSessionResponseMessage.h"
 #include "NewSessionConfirmMessage.h"
-#include "GetHistoryMessage.h"
-#include "GetHistoryResponseMessage.h"
+#include "GetChatMessagesMessage.h"
+#include "GetChatMessagesResponseMessage.h"
 #include "AddMessageMessage.h"
 #include "NotificationMessage.h"
 #include "AddUserMessage.h"
@@ -53,21 +53,21 @@ void TcpClientWorker::init()
             });
 }
 
-void TcpClientWorker::addGetChatRequest(const QUuid &sessionId)
+void TcpClientWorker::requestChatMessages(const QUuid &sessionId)
 {
-    Request request(std::make_shared<GetHistoryMessage>(sessionId));
+    Request request(std::make_shared<GetChatMessagesMessage>(sessionId));
     requestQueue.push(std::move(request));
     continueRequestProcessing();
 }
 
-void TcpClientWorker::addSendChatMessageRequest(const QUuid &sessionId, const NewChatMessageData& message)
+void TcpClientWorker::requestAddChatMessage(const QUuid &sessionId, const NewChatMessageData& message)
 {
-    Request request(std::make_shared<AddMessageMessage>(sessionId, message));
+    Request request(std::make_shared<AddChatMessageMessage>(sessionId, message));
     requestQueue.push(std::move(request));
     continueRequestProcessing();
 }
 
-void TcpClientWorker::addUserRequest(const QUuid &sessionId, const QString &username, const QString &password, const UserRole role)
+void TcpClientWorker::requestAddUser(const QUuid &sessionId, const QString &username, const QString &password, const UserRole role)
 {
     Request request(std::make_shared<AddUserMessage>(sessionId, username, password, role));
     requestQueue.push(std::move(request));
@@ -103,14 +103,14 @@ void TcpClientWorker::disconnect()
     }
 }
 
-void TcpClientWorker::requestNewSessionRequest(const QUuid &userId, const QString &username, const QString& password)
+void TcpClientWorker::requestNewSession(const QUuid &userId, const QString &username, const QString& password)
 {
     Request request(std::make_shared<NewSessionRequestMessage>(userId, username, password));
     requestQueue.push(std::move(request));
     continueRequestProcessing();
 }
 
-void TcpClientWorker::confirmSessionRequest(const QUuid &userId, const QUuid &sessionId)
+void TcpClientWorker::requestConfirmSession(const QUuid &userId, const QUuid &sessionId)
 {
     Request request(std::make_shared<NewSessionConfirmMessage>(userId, sessionId), false);
     requestQueue.push(std::move(request));
@@ -229,89 +229,22 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
             }
             break;
         }
-        // case MessageType::NewSessionFailedResponse:{
-        //     if(currentRequestMessageType != MessageType::NewSessionRequest){
-        //         qWarning() << "Invalid message type";
-        //         break;
-        //     }
-        //     bool success = false;
-        //     auto responseMessage = MessageUtils::createMessageFromJson<NewSessionFailedResponseMessage>(document, &success);
-        //     if(!success){
-        //         qWarning() << "Error parsing received message";
-        //         break;
-        //     }
-
-        //     break;
-        // }
-        case MessageType::GetHistoryResponse:{
-            if(currentRequestMessageType != MessageType::GetHistory){
+        case MessageType::GetChatMessagesResponse:{
+            if(currentRequestMessageType != MessageType::GetChatMessages){
                 qWarning() << "Invalid message type";
                 break;
             }
 
             bool success = false;
-            auto responseMessage = MessageUtils::createMessageFromJson<GetHistoryResponseMessage>(document, &success);
+            auto responseMessage = MessageUtils::createMessageFromJson<GetChatMessagesResponseMessage>(document, &success);
             if(!success){
                 qWarning() << "Error parsing received message";
                 break;
             }
 
-            emit chatHistoryReceived(responseMessage.getMessagesHistory());
+            emit chatMessagesReceived(responseMessage.getMessagesHistory());
             break;
         }
-        // case MessageType::AddMessageResponse:{
-        //     if(currentRequestMessageType != MessageType::AddMessage){
-        //         qWarning() << "Invalid message type";
-        //         break;
-        //     }
-
-        //     bool success = false;
-        //     auto responseMessage = MessageUtils::createMessageFromJson<AddMessageResponseMessage>(document, &success);
-        //     if(!success){
-        //         qWarning() << "Error parsing received message";
-        //         break;
-        //     }
-
-        //     if(!responseMessage.getResult()){
-        //         qWarning() << "Message send failed";
-        //     }
-        //     else{
-        //         emit chatMessageSentSuccess();
-        //     }
-        //     break;
-        // }
-        // case MessageType::AddUserResponse:{
-        //     if(currentRequestMessageType != MessageType::AddUserResponse){
-        //         qWarning() << "Invalid message type";
-        //         break;
-        //     }
-
-        //     bool success = false;
-        //     auto responseMessage = MessageUtils::createMessageFromJson<AddUserResponseMessage>(document, &success);
-        //     if(!success){
-        //         qWarning() << "Error parsing received message";
-        //         break;
-        //     }
-
-        //     emit addUserResultReceived(responseMessage.getResult());
-        //     break;
-        // }
-        // case MessageType::BadRequestResponse:{
-        //     if(currentRequestMessageType != MessageType::GetHistory &&
-        //         currentRequestMessageType != MessageType::AddMessage){
-        //         qWarning() << "Invalid message type";
-        //         break;
-        //     }
-
-        //     bool success = false;
-        //     auto responseMessage = MessageUtils::createMessageFromJson<BadRequestResponseMessage>(document, &success);
-        //     if(!success){
-        //         qWarning() << "Error parsing received message";
-        //         break;
-        //     }
-
-        //     emit serverReceivedBadRequest(responseMessage.getErrorInfo());
-        // }
         case MessageType::ResponseMessage:{
             bool success = false;
             auto responseMessage = MessageUtils::createMessageFromJson<ResponseMessage>(document, &success);
@@ -322,15 +255,8 @@ void TcpClientWorker::processMessageData(const QByteArray &data, bool &responseR
 
             switch (responseMessage.getRespondedToMessageType()){
                 case MessageType::AddMessage:
-                    if(responseMessage.getErrorInfo().errorCode == ErrorCode::NoError){
-                        emit chatMessageSentSuccess();
-                    }
-                    else{
-                        //TODO: Show error to user
-                        qWarning() << "Message send failed";
-
+                    emit addChatMessageResultReceived(responseMessage.getErrorInfo().errorCode == ErrorCode::NoError);
                     break;
-                }
                 case MessageType::AddUser:
                     emit addUserResultReceived(responseMessage.getErrorInfo().errorCode == ErrorCode::NoError);
                     break;

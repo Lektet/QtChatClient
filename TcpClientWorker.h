@@ -49,13 +49,13 @@ public slots:
     void connectToServer(const QString &host, const quint16 port);
     void disconnect();
 
-    void requestNewSessionRequest(const QUuid& userId, const QString& username, const QString& password);
-    void confirmSessionRequest(const QUuid& userId, const QUuid& sessionId);
+    void requestNewSession(const QUuid& userId, const QString& username, const QString& password);
+    void requestConfirmSession(const QUuid& userId, const QUuid& sessionId);
 
-    void addGetChatRequest(const QUuid& sessionId);
-    void addSendChatMessageRequest(const QUuid& sessionId, const NewChatMessageData& message);
+    void requestChatMessages(const QUuid& sessionId);
+    void requestAddChatMessage(const QUuid& sessionId, const NewChatMessageData& message);
 
-    void addUserRequest(const QUuid &sessionId, const QString &username, const QString &password, const UserRole role);
+    void requestAddUser(const QUuid &sessionId, const QString &username, const QString &password, const UserRole role);
 
 signals:
     void connectedSucessfully();
@@ -64,8 +64,8 @@ signals:
     void newSessionInitiated(const QUuid& userId, const QUuid& sessionId, const UserRole userRole);
     void newSessionFailed(const QUuid& userId);
 
-    void chatHistoryReceived(const std::vector<ChatMessageData> history);
-    void chatMessageSentSuccess();
+    void chatMessagesReceived(const std::vector<ChatMessageData> history);
+    void addChatMessageResultReceived(bool success);
     void chatHasBeenUpdated();
     void addUserResultReceived(bool success);
     void serverReceivedBadRequest(const ErrorInfo& errorInfo);

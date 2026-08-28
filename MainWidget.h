@@ -85,7 +85,7 @@ private:
 
 private slots:
     void onSendButtonPressed();
-    void onChatMessageSentSuccess();
+    void onAddChatMessageResultReceived(bool success);
 
     void onStartedSuccessfully();
     void onStoppedOnConnectionError(const QAbstractSocket::SocketError errorCode);
@@ -93,7 +93,7 @@ private slots:
 
     void onNewSessionInitiated(const QUuid& receivedUserId, const QUuid& receivedSessionId, const UserRole userRole);
     void onNewSessionFailed(const QUuid &receivedUserId);
-    void onChatHistoryReceived(const std::vector<ChatMessageData> chatHistory);
+    void onChatMessagesReceived(const std::vector<ChatMessageData> chatHistory);
     void onChatUpdated();
     void onServerReceivedBadRequest(const ErrorInfo& errorInfo);
 
