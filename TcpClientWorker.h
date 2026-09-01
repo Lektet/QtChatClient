@@ -74,10 +74,8 @@ signals:
 
 private:
     std::queue<Request> requestQueue;
-    Request lastSentRequest;
 
     std::unique_ptr<QTcpSocket> workerSocket;
-    QTimer requestTimer;
 
     std::mutex socketStateMutex;
     bool inRequestProcessing;
@@ -87,9 +85,8 @@ private:
     void onReadyRead();
     void processTopRequest();
     void processNotification(const NotificationMessage& notitification);
-    void processMessageData(const QByteArray& data, bool& responseReceived);
+    void processMessageData(const QByteArray& data);
 
-   bool isInRequestProcessing() const;
    void continueRequestProcessing();
    void finishRequest();
 

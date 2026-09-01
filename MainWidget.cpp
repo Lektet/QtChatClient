@@ -70,6 +70,7 @@ MainWidget::MainWidget(QWidget *parent)
     userManagmentWidget(new UserManagmentWidget()),
     settingsWidget(std::make_shared<SettingsWidget>()),
     tcpClient(new TcpClient(this)),
+    currentRequest(nullptr),
     messageModel(new MessageModel(this)),
     disconnecting(false)
 {
@@ -221,23 +222,27 @@ void MainWidget::onSendButtonPressed()
     }
 
     NewChatMessageData message(username, messageField->toPlainText());
-    tcpClient->addChatMessage(sessionId, message);
+    auto request = std::make_unique<SendMessageRequest>(std::move(message));
+    pushRequest(std::move(request));
 }
 
 void MainWidget::onAddChatMessageResultReceived(bool success)
 {
-    if(success){
-        qDebug() << "Chat message sent successfully";
+    if(currentRequest->type != RequestType::SendMessage){
+        qWarning() << "Unexpected call!";
+        return;
     }
-    else{
-        qWarning() << "Chat message sent failed";
-    }
+
+    qDebug() << "Chat message sent successfully";
+    finishRequest();
 }
 
 void MainWidget::onStartedSuccessfully()
 {
     userId = QUuid::createUuid();
-    tcpClient->initSession(userId, username, password);
+
+    auto request = std::make_unique<NewSessionRequest>(userId, username, password);
+    pushRequest(std::move(request));
 }
 
 void MainWidget::onStoppedOnConnectionError(const QAbstractSocket::SocketError errorCode)
@@ -251,43 +256,71 @@ void MainWidget::onStoppedOnConnectionError(const QAbstractSocket::SocketError e
 
 void MainWidget::onNewSessionInitiated(const QUuid &receivedUserId, const QUuid &receivedSessionId, const UserRole userRole)
 {
+    if(currentRequest->type != RequestType::NewSession){
+        qWarning() << "Unexpected call!";
+        return;
+    }
+
     if(receivedSessionId.isNull()){
         QMessageBox::warning(this, tr("Login error"), tr("Invalid login data received"));
+        finishRequest();
         tcpClient->stop();//TODO: Implement login/logout logic
         return;
     }
 
     if(receivedUserId != userId){
         QMessageBox::warning(this, tr("Login error"), tr("Invalid login data received"));
+        finishRequest();
         tcpClient->stop();//TODO: Implement login/logout logic
         return;
     }
 
     sessionId = receivedSessionId;
 
-    tcpClient->confirmSession(userId, sessionId);
-    tcpClient->requestChatMessages(sessionId);
+    finishRequest();
+
+    auto confirmRequest = std::make_unique<ConfirmSessionRequest>(userId, sessionId);
+    pushRequest(std::move(confirmRequest));
+
+    auto chatRequest = std::make_unique<Request>(RequestType::ChatHistory);
+    pushRequest(std::move(chatRequest));
 
     userManagmentAction->setDisabled(userRole != UserRole::Admin);
     sendMessageWidget->setVisible(userRole != UserRole::Guest);
+
+    // setState(State::ChatRequested);
 }
 
 void MainWidget::onNewSessionFailed(const QUuid &receivedUserId)
 {
+    if(currentRequest->type != RequestType::NewSession){
+        qWarning() << "Unexpected call!";
+        return;
+    }
+
     if(receivedUserId.isNull() || receivedUserId != userId){
+        finishRequest();
         qWarning() << "Received invalid  user id!";
     }
     else{
         QMessageBox::warning(this, tr("Login failed"), tr("Invalid credentials"));
+        finishRequest();
         tcpClient->stop();//TODO: Implement login/logout logic
     }
 }
 
 void MainWidget::onChatMessagesReceived(const std::vector<ChatMessageData> chatHistory)
 {
+    if(currentRequest->type != RequestType::ChatHistory){
+        qWarning() << "Unexpected call!";
+        return;
+    }
+
     messageModel->setMessages(std::move(chatHistory));
     messagesViewer->setDataFromModel(messageModel);
     messagesViewer->verticalScrollBar()->setValue(messagesViewer->verticalScrollBar()->maximum());
+
+    finishRequest();
 }
 
 void MainWidget::onTcpClientStopped()
@@ -300,7 +333,8 @@ void MainWidget::onTcpClientStopped()
 
 void MainWidget::onChatUpdated()
 {
-    tcpClient->requestChatMessages(sessionId);
+    auto request = std::make_unique<Request>(RequestType::ChatHistory);
+    pushRequest(std::move(request));
 }
 
 void MainWidget::onServerReceivedBadRequest(const ErrorInfo &errorInfo)
@@ -346,15 +380,81 @@ void MainWidget::onSettingsWidgetCanceled()
 
 void MainWidget::onNewUserSubmitted(const QString &username, const QString &password, const UserRole role)
 {
-    tcpClient->addUser(sessionId, username, password, role);
+    auto request = std::make_unique<AddUserRequest>(username, password, role);
+    pushRequest(std::move(request));
 }
 
 void MainWidget::onAddUserResultReceived(bool success)
 {
+    if(currentRequest->type != RequestType::AddUser){
+        qWarning() << "Unexpected call!";
+        return;
+    }
+
     if(success){
         QMessageBox::information(this, tr("User created"), tr("New user successfully created!"));
     }
     else{
         QMessageBox::warning(this, tr("User not created"), tr("Failed to create new user!"));
+    }
+
+    finishRequest();
+}
+
+void MainWidget::finishRequest()
+{
+    currentRequest = nullptr;
+    processTopRequest();
+}
+
+void MainWidget::pushRequest(std::unique_ptr<Request> request)
+{
+    requestQueue.push(std::move(request));
+    if(currentRequest == nullptr){
+        processTopRequest();
+    }
+}
+
+void MainWidget::processTopRequest()
+{
+    if(requestQueue.empty()){
+        return;
+    }
+
+    currentRequest = std::move(requestQueue.front());
+    requestQueue.pop();
+
+    switch (currentRequest->type) {
+    case RequestType::NewSession:{
+        auto request = static_cast<NewSessionRequest*>(currentRequest.get());
+        tcpClient->initSession(userId, request->username, request->password);
+        break;
+    }
+    case RequestType::ConfirmSession:
+        tcpClient->confirmSession(userId, sessionId);
+        break;
+    case RequestType::ChatHistory:
+        tcpClient->requestChatMessages(sessionId);
+        break;
+    case RequestType::SendMessage:{
+        auto request = static_cast<SendMessageRequest*>(currentRequest.get());
+        tcpClient->addChatMessage(sessionId, request->messageData);
+        break;
+    }
+    case RequestType::AddUser:{
+        auto request = static_cast<AddUserRequest*>(currentRequest.get());
+        tcpClient->addUser(sessionId, request->username, request->password, request->role);
+        break;
+    }
+    case RequestType::DeleteUser:
+    default:
+        break;
+    }
+
+    if(!currentRequest->responseRequired ){
+        currentRequest = nullptr;
+        if(!requestQueue.empty()){
+            processTopRequest();
+        }
     }
 }

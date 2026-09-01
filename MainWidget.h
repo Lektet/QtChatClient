@@ -15,8 +15,10 @@
 #include <QUuid>
 
 #include "ChatMessageData.h"
+#include "NewChatMessageData.h"
 
 #include <set>
+#include <queue>
 
 class MessageItemDelegate;
 class TcpClient;
@@ -47,6 +49,85 @@ private:
         UserManagment
     };
 
+    enum class RequestType{
+        NewSession,
+        ConfirmSession,
+        ChatHistory,
+        SendMessage,
+        AddUser,
+        DeleteUser
+    };
+
+    struct Request{
+        explicit Request(RequestType requestType,
+                         bool responseToRequestAwaited = true):
+            type(requestType),
+            responseRequired(responseToRequestAwaited){
+
+        };
+
+        RequestType type;
+        bool responseRequired;
+    };
+
+    struct NewSessionRequest: public Request{
+        explicit NewSessionRequest(
+            const QUuid& userId,
+            QString newSessionUsernameme,
+            QString newSessionPassword):
+            Request(RequestType::NewSession),
+            userId(userId),
+            username(std::move(newSessionUsernameme)),
+            password(std::move(newSessionPassword))
+        {
+        };
+
+        QUuid userId;
+        QString username;
+        QString password;
+    };
+
+    struct ConfirmSessionRequest: public Request{
+        explicit ConfirmSessionRequest(
+            const QUuid& confirmUserId,
+            const QUuid& confirmSessionId):
+            Request(RequestType::ConfirmSession, false),
+            userId(confirmUserId),
+            sessionId(confirmSessionId)
+        {
+        };
+
+        QUuid userId;
+        QUuid sessionId;
+    };
+
+    struct SendMessageRequest: public Request{
+        explicit SendMessageRequest(NewChatMessageData newMessageData):
+            Request(RequestType::SendMessage),
+            messageData(std::move(newMessageData))
+        {
+        };
+
+        NewChatMessageData messageData;
+    };
+
+    struct AddUserRequest: public Request{
+        explicit AddUserRequest(QString newUserUsernameme,
+                                QString newUserPassword,
+                                UserRole newUserRole):
+            Request(RequestType::AddUser),
+            username(std::move(newUserUsernameme)),
+            password(std::move(newUserPassword)),
+            role(newUserRole)
+        {
+
+        };
+
+        QString username;
+        QString password;
+        UserRole role;
+    };
+
     QStackedWidget* stackedWidget;
     QAction* settingsAction;
     QAction* messagesAction;
@@ -68,6 +149,10 @@ private:
     std::map<WidgetTypes, int> widgetIndexes;
 
     TcpClient* tcpClient;
+
+    std::queue<std::unique_ptr<Request>> requestQueue;
+    std::unique_ptr<Request> currentRequest;
+
     MessageModel* messageModel;
 
     QString username;
@@ -82,6 +167,9 @@ private:
 
     void cleanChat();
     void setupLayout();
+
+    void pushRequest(std::unique_ptr<Request> request);
+    void processTopRequest();
 
 private slots:
     void onSendButtonPressed();
@@ -102,6 +190,7 @@ private slots:
 
     void onNewUserSubmitted(const QString& username, const QString& password, const UserRole role);
     void onAddUserResultReceived(bool success);
+    void finishRequest();
 };
 
 #endif // MAINWINDOW_H
