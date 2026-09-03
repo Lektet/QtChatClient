@@ -24,60 +24,56 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="190"/>
+        <location filename="MainWidget.cpp" line="194"/>
         <source>Message:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="251"/>
+        <location filename="MainWidget.cpp" line="264"/>
         <source>Connection error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="251"/>
+        <location filename="MainWidget.cpp" line="264"/>
         <source>Disconnected by server</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="265"/>
-        <location filename="MainWidget.cpp" line="272"/>
+        <location filename="MainWidget.cpp" line="299"/>
+        <location filename="MainWidget.cpp" line="305"/>
         <source>Login error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="265"/>
-        <location filename="MainWidget.cpp" line="272"/>
+        <location filename="MainWidget.cpp" line="299"/>
+        <location filename="MainWidget.cpp" line="305"/>
         <source>Invalid login data received</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="306"/>
-        <source>Login failed</source>
+        <location filename="MainWidget.cpp" line="438"/>
+        <source>Create user error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="306"/>
-        <source>Invalid credentials</source>
+        <location filename="MainWidget.cpp" line="280"/>
+        <source>Received invalid  user id!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="395"/>
+        <location filename="MainWidget.cpp" line="328"/>
+        <location filename="MainWidget.cpp" line="332"/>
+        <source>Error</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="MainWidget.cpp" line="432"/>
         <source>User created</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="395"/>
+        <location filename="MainWidget.cpp" line="432"/>
         <source>New user successfully created!</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="MainWidget.cpp" line="398"/>
-        <source>User not created</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="MainWidget.cpp" line="398"/>
-        <source>Failed to create new user!</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

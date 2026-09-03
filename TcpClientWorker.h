@@ -61,13 +61,17 @@ signals:
     void connectedSucessfully();
     void connectionErrorOccured(QAbstractSocket::SocketError errorCode);
 
-    void newSessionInitiated(const QUuid& userId, const QUuid& sessionId, const UserRole userRole);
-    void newSessionFailed(const QUuid& userId);
+    void newSessionRequestResultReceived(const QUuid& userId,
+                                         const QUuid& sessionId,
+                                         const UserRole userRole,
+                                         const ErrorInfo& errorInfo);
 
-    void chatMessagesReceived(const std::vector<ChatMessageData> history);
-    void addChatMessageResultReceived(bool success);
+    void errorReceived(const ErrorInfo &errorInfo);
+
+    void chatMessagesReceived(const std::vector<ChatMessageData> history, const ErrorInfo &errorInfo);
+    void addChatMessageResultReceived(const ErrorInfo &errorInfo);
     void chatHasBeenUpdated();
-    void addUserResultReceived(bool success);
+    void addUserResultReceived(const ErrorInfo &errorInfo);
     void serverReceivedBadRequest(const ErrorInfo& errorInfo);
 
     void disconnected();

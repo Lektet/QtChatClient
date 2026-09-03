@@ -68,7 +68,7 @@ MainWidget::MainWidget(QWidget *parent)
     messageField(new QTextEdit()),
     sendButton(new QPushButton(tr("sendButton"))),
     userManagmentWidget(new UserManagmentWidget()),
-    settingsWidget(std::make_shared<SettingsWidget>()),
+    settingsWidget(std::make_unique<SettingsWidget>()),
     tcpClient(new TcpClient(this)),
     currentRequest(nullptr),
     messageModel(new MessageModel(this)),
@@ -77,6 +77,8 @@ MainWidget::MainWidget(QWidget *parent)
     setupLayout();
 
     qRegisterMetaType<UserRole>();
+    qRegisterMetaType<ErrorInfo>();
+    qRegisterMetaType<std::vector<ChatMessageData>>();
 
     connect(sendButton, &QPushButton::pressed, this, &MainWidget::onSendButtonPressed);
     connect(settingsAction, &QAction::triggered, this, [this](){
@@ -91,14 +93,14 @@ MainWidget::MainWidget(QWidget *parent)
     connect(userManagmentWidget, &UserManagmentWidget::newUserSubmitted,
             this, &MainWidget::onNewUserSubmitted);
 
-    connect(tcpClient, &TcpClient::newSessionInitiated,
-            this, &MainWidget::onNewSessionInitiated);
-    connect(tcpClient, &TcpClient::newSessionFailed,
-            this, &MainWidget::onNewSessionFailed);
+    connect(tcpClient, &TcpClient::newSessionRequestResultReceived,
+            this, &MainWidget::onNewSessionRequestResultReceived);
+    connect(tcpClient, &TcpClient::errorReceived,
+            this, &MainWidget::onErrorReceived);
     connect(tcpClient, &TcpClient::addChatMessageResultReceived,
             this, &MainWidget::onAddChatMessageResultReceived);
     connect(tcpClient, &TcpClient::chatMessagesReceived,
-            this, &MainWidget::onChatMessagesReceived);
+            this, &MainWidget::onGetChatMessagesReceived);
     connect(tcpClient, &TcpClient::startedSuccessfully,
             this, &MainWidget::onStartedSuccessfully);
     connect(tcpClient, &TcpClient::serverReceivedBadRequest,
@@ -151,6 +153,8 @@ void MainWidget::paintEvent(QPaintEvent *event)
 
 void MainWidget::cleanChat()
 {
+    currentRequest = nullptr;
+
     messageModel->setMessages(std::vector<ChatMessageData>());
     messagesViewer->setDataFromModel(messageModel);
 }
@@ -226,14 +230,20 @@ void MainWidget::onSendButtonPressed()
     pushRequest(std::move(request));
 }
 
-void MainWidget::onAddChatMessageResultReceived(bool success)
+void MainWidget::onAddChatMessageResultReceived(const ErrorInfo &errorInfo)
 {
-    if(currentRequest->type != RequestType::SendMessage){
+    if(currentRequest == nullptr || currentRequest->type != RequestType::SendMessage){
         qWarning() << "Unexpected call!";
         return;
     }
 
-    qDebug() << "Chat message sent successfully";
+    if(errorInfo.errorCode != ErrorCode::NoError){
+        warn(this, "Message sending error", "Failed to send message", errorInfo);
+    }
+    else{
+        qInfo() << "Chat message sent successfully";
+    }
+
     finishRequest();
 }
 
@@ -247,40 +257,57 @@ void MainWidget::onStartedSuccessfully()
 
 void MainWidget::onStoppedOnConnectionError(const QAbstractSocket::SocketError errorCode)
 {
-    if(errorCode == QAbstractSocket::SocketError::RemoteHostClosedError){
-        QMessageBox::warning(this, tr("Connection error"), tr("Disconnected by server"));
-    }
     setDisabled(true);
     settingsWidget->show();
+
+    if(errorCode == QAbstractSocket::SocketError::RemoteHostClosedError){
+        QMessageBox::warning(settingsWidget.get(), tr("Connection error"), tr("Disconnected by server"));
+    }
 }
 
-void MainWidget::onNewSessionInitiated(const QUuid &receivedUserId, const QUuid &receivedSessionId, const UserRole userRole)
+void MainWidget::onNewSessionRequestResultReceived(const QUuid &receivedUserId,
+                                                   const QUuid &receivedSessionId,
+                                                   const UserRole userRole,
+                                                   const ErrorInfo &errorInfo)
 {
-    if(currentRequest->type != RequestType::NewSession){
+    if(currentRequest == nullptr || currentRequest->type != RequestType::NewSession){
         qWarning() << "Unexpected call!";
         return;
     }
 
+    if(errorInfo.errorCode != ErrorCode::NoError){
+        if(receivedUserId.isNull() || receivedUserId != userId){
+            qWarning() << tr("Received invalid  user id!");
+        }
+        else{
+            const char* errorMsg;
+            if(errorInfo.errorCode == ErrorCode::InvalidData){
+                errorMsg = "Invalid credentials";
+            }
+            else{
+                errorMsg = "Login error";
+            }
+            warn(settingsWidget.get(), "Login error", errorMsg, errorInfo);
+        }
+
+        currentRequest = nullptr;
+        tcpClient->stop();//TODO: Implement login/logout logic
+        return;
+    }
+
     if(receivedSessionId.isNull()){
-        QMessageBox::warning(this, tr("Login error"), tr("Invalid login data received"));
-        finishRequest();
+        QMessageBox::warning(settingsWidget.get(), tr("Login error"), tr("Invalid login data received"));
         tcpClient->stop();//TODO: Implement login/logout logic
         return;
     }
 
     if(receivedUserId != userId){
-        QMessageBox::warning(this, tr("Login error"), tr("Invalid login data received"));
-        finishRequest();
+        QMessageBox::warning(settingsWidget.get(), tr("Login error"), tr("Invalid login data received"));
         tcpClient->stop();//TODO: Implement login/logout logic
         return;
     }
 
     sessionId = receivedSessionId;
-
-    finishRequest();
-
-    auto confirmRequest = std::make_unique<ConfirmSessionRequest>(userId, sessionId);
-    pushRequest(std::move(confirmRequest));
 
     auto chatRequest = std::make_unique<Request>(RequestType::ChatHistory);
     pushRequest(std::move(chatRequest));
@@ -288,32 +315,38 @@ void MainWidget::onNewSessionInitiated(const QUuid &receivedUserId, const QUuid 
     userManagmentAction->setDisabled(userRole != UserRole::Admin);
     sendMessageWidget->setVisible(userRole != UserRole::Guest);
 
-    // setState(State::ChatRequested);
+    finishRequest();
 }
 
-void MainWidget::onNewSessionFailed(const QUuid &receivedUserId)
+void MainWidget::onErrorReceived(const ErrorInfo &errorInfo)
 {
-    if(currentRequest->type != RequestType::NewSession){
-        qWarning() << "Unexpected call!";
-        return;
+    if(currentRequest == nullptr){
+        qWarning() << "Unexpected message received!";
     }
 
-    if(receivedUserId.isNull() || receivedUserId != userId){
-        finishRequest();
-        qWarning() << "Received invalid  user id!";
+    if(currentRequest->type == RequestType::NewSession ){
+        QMessageBox::warning(settingsWidget.get(), tr("Error"), errorInfo.errorDescription);
+        tcpClient->stop();
     }
     else{
-        QMessageBox::warning(this, tr("Login failed"), tr("Invalid credentials"));
+        QMessageBox::warning(this, tr("Error"), errorInfo.errorDescription);
         finishRequest();
-        tcpClient->stop();//TODO: Implement login/logout logic
     }
 }
 
-void MainWidget::onChatMessagesReceived(const std::vector<ChatMessageData> chatHistory)
+void MainWidget::onGetChatMessagesReceived(const std::vector<ChatMessageData> chatHistory, const ErrorInfo &errorInfo)
 {
-    if(currentRequest->type != RequestType::ChatHistory){
+    if(currentRequest == nullptr || currentRequest->type != RequestType::ChatHistory){
         qWarning() << "Unexpected call!";
         return;
+    }
+
+    if(errorInfo.errorCode != ErrorCode::NoError){
+        warn(this,
+             "Get chat messages error",
+             "Failed to get chat messages!",
+             errorInfo);
+        finishRequest();
     }
 
     messageModel->setMessages(std::move(chatHistory));
@@ -329,6 +362,10 @@ void MainWidget::onTcpClientStopped()
         close();
         return;
     }
+
+    std::queue<std::unique_ptr<Request>> empty;
+    std::swap(requestQueue, empty);
+    settingsWidget->show();
 }
 
 void MainWidget::onChatUpdated()
@@ -384,18 +421,22 @@ void MainWidget::onNewUserSubmitted(const QString &username, const QString &pass
     pushRequest(std::move(request));
 }
 
-void MainWidget::onAddUserResultReceived(bool success)
+void MainWidget::onAddUserResultReceived(const ErrorInfo &errorInfo)
 {
-    if(currentRequest->type != RequestType::AddUser){
+    if(currentRequest == nullptr || currentRequest->type != RequestType::AddUser){
         qWarning() << "Unexpected call!";
         return;
     }
 
-    if(success){
+    if(errorInfo.errorCode == ErrorCode::NoError){
         QMessageBox::information(this, tr("User created"), tr("New user successfully created!"));
     }
     else{
-        QMessageBox::warning(this, tr("User not created"), tr("Failed to create new user!"));
+        const char* errorMsg = "User not created!";
+        qWarning() << errorMsg << " Error: " << errorInfo;
+        QMessageBox::warning(this,
+                             tr("Create user error"),
+                             tr(errorMsg));
     }
 
     finishRequest();
@@ -457,4 +498,12 @@ void MainWidget::processTopRequest()
             processTopRequest();
         }
     }
+}
+
+void MainWidget::warn(QWidget *parent, const char *title, const char *msg, const ErrorInfo &errorInfo)
+{
+    qWarning() << msg << " Error: " << errorInfo;
+    QMessageBox::warning(parent,
+                         tr(title),
+                         tr(msg));
 }

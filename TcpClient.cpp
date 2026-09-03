@@ -108,10 +108,10 @@ void TcpClient::start(const QString &host, const quint16 port)
     worker = new TcpClientWorker();
 
     worker->moveToThread(workerThread);
-    connect(worker, &TcpClientWorker::newSessionInitiated,
-            this, &TcpClient::newSessionInitiated, Qt::QueuedConnection);
-    connect(worker, &TcpClientWorker::newSessionFailed,
-            this, &TcpClient::newSessionFailed, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::newSessionRequestResultReceived,
+            this, &TcpClient::newSessionRequestResultReceived, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::errorReceived,
+            this, &TcpClient::errorReceived, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::chatMessagesReceived,
             this, &TcpClient::chatMessagesReceived, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::addChatMessageResultReceived,
@@ -201,7 +201,7 @@ void TcpClient::stopWorkerOnConnectionError(QAbstractSocket::SocketError errorCo
 
 void TcpClient::onWorkerDisconnected()
 {
-    qDebug() << "onWorkerStopped()";
+    qDebug() << "onWorkerDisconnected()";
 
     connected = false;
 

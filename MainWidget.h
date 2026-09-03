@@ -144,7 +144,7 @@ private:
 
     UserManagmentWidget* userManagmentWidget;
 
-    std::shared_ptr<SettingsWidget> settingsWidget;
+    std::unique_ptr<SettingsWidget> settingsWidget;
 
     std::map<WidgetTypes, int> widgetIndexes;
 
@@ -171,17 +171,25 @@ private:
     void pushRequest(std::unique_ptr<Request> request);
     void processTopRequest();
 
+    void warn(QWidget *parent, const char* title, const char* msg, const ErrorInfo& errorInfo);
+
 private slots:
     void onSendButtonPressed();
-    void onAddChatMessageResultReceived(bool success);
-
     void onStartedSuccessfully();
     void onStoppedOnConnectionError(const QAbstractSocket::SocketError errorCode);
     void onTcpClientStopped();
 
-    void onNewSessionInitiated(const QUuid& receivedUserId, const QUuid& receivedSessionId, const UserRole userRole);
-    void onNewSessionFailed(const QUuid &receivedUserId);
-    void onChatMessagesReceived(const std::vector<ChatMessageData> chatHistory);
+    void onNewSessionRequestResultReceived(const QUuid& receivedUserId,
+                                           const QUuid& receivedSessionId,
+                                           const UserRole userRole,
+                                           const ErrorInfo& errorInfo);
+
+    void onErrorReceived(const ErrorInfo& errorInfo);
+
+    void onGetChatMessagesReceived(const std::vector<ChatMessageData> chatHistory,
+                                   const ErrorInfo& errorInfo);
+    void onAddChatMessageResultReceived(const ErrorInfo &errorInfo);
+
     void onChatUpdated();
     void onServerReceivedBadRequest(const ErrorInfo& errorInfo);
 
@@ -189,7 +197,7 @@ private slots:
     void onSettingsWidgetCanceled();
 
     void onNewUserSubmitted(const QString& username, const QString& password, const UserRole role);
-    void onAddUserResultReceived(bool success);
+    void onAddUserResultReceived(const ErrorInfo& errorInfo);
     void finishRequest();
 };
 

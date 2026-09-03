@@ -174,19 +174,24 @@ void TcpClientWorker::processMessageData(const QByteArray &data)
             bool success = false;
             auto responseMessage = MessageUtils::createMessageFromJson<NewSessionResponseMessage>(document, &success);
             if(!success){
+                //TODO: Signal about error
                 qWarning() << "Error parsing received message";
                 break;
             }
 
-            bool sessionInitiated = responseMessage.getErrorInfo().errorCode == ErrorCode::NoError;
-            if(sessionInitiated){
-                emit newSessionInitiated(responseMessage.getUserId(),
-                                         responseMessage.getSessionId(),
-                                         responseMessage.getUserRole());
-            }
-            else{
-                emit newSessionFailed(responseMessage.getUserId());
-            }
+            // bool sessionInitiated = responseMessage.getErrorInfo().errorCode == ErrorCode::NoError;
+            // if(sessionInitiated){
+            //     emit newSessionInitiated(responseMessage.getUserId(),
+            //                              responseMessage.getSessionId(),
+            //                              responseMessage.getUserRole());
+            // }
+            // else{
+            //     emit newSessionFailed(responseMessage.getUserId());
+            // }
+            emit newSessionRequestResultReceived(responseMessage.getUserId(),
+                                                 responseMessage.getSessionId(),
+                                                 responseMessage.getUserRole(),
+                                                 responseMessage.getErrorInfo());
             break;
         }
         case MessageType::GetChatMessagesResponse:{
@@ -197,7 +202,7 @@ void TcpClientWorker::processMessageData(const QByteArray &data)
                 break;
             }
 
-            emit chatMessagesReceived(responseMessage.getMessagesHistory());
+            emit chatMessagesReceived(responseMessage.getMessagesHistory(), responseMessage.getErrorInfo());
             break;
         }
         case MessageType::ResponseMessage:{
@@ -205,25 +210,41 @@ void TcpClientWorker::processMessageData(const QByteArray &data)
             auto responseMessage = MessageUtils::createMessageFromJson<ResponseMessage>(document, &success);
             if(!success){
                 qWarning() << "Error parsing received message";
-                break;
             }
 
-            switch (responseMessage.getRespondedToMessageType()){
-                case MessageType::AddMessage:
-                    emit addChatMessageResultReceived(responseMessage.getErrorInfo().errorCode == ErrorCode::NoError);
-                    break;
-                case MessageType::AddUser:
-                    emit addUserResultReceived(responseMessage.getErrorInfo().errorCode == ErrorCode::NoError);
-                    break;
-                case MessageType::BadRequestResponse:
-                    emit serverReceivedBadRequest(responseMessage.getErrorInfo());
-                    break;
-                default:
-                    break;
-                }
-
+            emit errorReceived(responseMessage.getErrorInfo());
             break;
         }
+        case MessageType::AddMessageResponse:{
+            bool success = false;
+            auto responseMessage = MessageUtils::createMessageFromJson<ResponseMessage>(document, &success);
+            if(!success){
+                qWarning() << "Error parsing received message";
+            }
+            emit addChatMessageResultReceived(responseMessage.getErrorInfo());
+            break;
+        }
+        case MessageType::AddUserResponse:{
+            bool success = false;
+            auto responseMessage = MessageUtils::createMessageFromJson<ResponseMessage>(document, &success);
+            if(!success){
+                qWarning() << "Error parsing received message";
+            }
+            emit addUserResultReceived(responseMessage.getErrorInfo());
+            break;
+        }
+        case MessageType::BadRequestResponse:{
+            bool success = false;
+            auto responseMessage = MessageUtils::createMessageFromJson<ResponseMessage>(document, &success);
+            if(!success){
+                qWarning() << "Error parsing received message";
+            }
+            emit serverReceivedBadRequest(responseMessage.getErrorInfo());
+            break;
+        }
+        case MessageType::Invalid:
+            qWarning() << "Invalid message type";
+            break;
         default:
             break;
     }
