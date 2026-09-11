@@ -11,9 +11,12 @@
 const int HEADER_HEIGHT = 20;
 const QString dateFormat = "dd.MM.yyyy hh:mm:ss";
 
+const int MARGIN = 5;
+const int PADDING = 4;
+
 MessageItemDelegate::MessageItemDelegate(QObject *parent) :
     QStyledItemDelegate(parent),
-    width(0)
+    rightMargin(0)
 {
 
 }
@@ -22,57 +25,48 @@ void MessageItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
 {
     QStyleOptionViewItem styledOption(option);
     initStyleOption(&styledOption, index);
+
+    auto drawRect = option.rect.adjusted(MARGIN, MARGIN, -MARGIN, -MARGIN);
+
     painter->save();
 
-    painter->drawText(option.rect, index.data(MessageDataRole::Time).toDateTime().toString(dateFormat));
+    painter->setRenderHint(QPainter::Antialiasing);
 
-    auto messageTextDrawRect = option.rect.translated(0, HEADER_HEIGHT);
+    painter->setBrush(QBrush(QColor(Qt::GlobalColor::lightGray)));
+    painter->drawRoundedRect(drawRect, 6, 6);
+
+    auto textDrawRect = drawRect.adjusted(PADDING, PADDING, - PADDING, - PADDING);
+    painter->drawText(textDrawRect, index.data(MessageDataRole::Time).toDateTime().toString(dateFormat));
+
+    auto messageTextDrawRect = textDrawRect.translated(0, HEADER_HEIGHT);
     painter->drawText(messageTextDrawRect, index.data(MessageDataRole::Text).toString());
 
     painter->restore();
-
-    auto font = painter->font();
-    QFontMetrics fontMetrics(font);
-    auto textRect = fontMetrics.boundingRect(styledOption.rect,
-                                             Qt::AlignLeft | Qt::TextWordWrap,
-                                             index.data(MessageDataRole::Text).toString());
-
-//    qDebug() << "text: " << index.data(MessageDataRole::Text).toString();
-//    qDebug() << "Styled option rect: " << styledOption.rect;
-//    qDebug() << "text bounding rect " << textRect;
 }
 
 QSize MessageItemDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
-    QRect boundingRect(0, 0, width, 10);
+    QStyleOptionViewItem styledOption(option);
+    initStyleOption(&styledOption, index);
 
-
-//    qDebug() << "width: " << width;
-//    qDebug() << "boundingRect: " << boundingRect;
-//    auto boundingRect = option.rect;
-//    boundingRect.translate(-boundingRect.x(), -boundingRect.y());
+    QRect boundingRect(0, 0, styledOption.widget->width() - rightMargin - MARGIN * 2 - PADDING * 2, 10);
     auto text = index.data(MessageDataRole::Text).toString();
     auto textRect = option.fontMetrics.boundingRect(boundingRect,
                                                     Qt::AlignLeft | Qt::TextWordWrap,
                                                     text);
 
     auto size = textRect.size();
-    size.setHeight(size.height() + HEADER_HEIGHT);
-
-//    qDebug() << "Computed size: " << size;
-
-//    auto size = option.rect.size();
-//    size.setHeight(40);
+    size.setWidth(size.width() + MARGIN * 2 + PADDING * 2);
+    size.setHeight(size.height() + HEADER_HEIGHT + MARGIN * 2 + PADDING * 2);
     return size;
 }
 
-void MessageItemDelegate::setWidth(const int width)
+void MessageItemDelegate::setRightMargin(const int width)
 {
-//    qDebug() << "setWidth() width: " << width;
-    this->width = width;
+    rightMargin = width;
 }
 
-int MessageItemDelegate::getWidth() const
+int MessageItemDelegate::getRightMargin() const
 {
-    return width;
+    return rightMargin;
 }

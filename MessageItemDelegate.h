@@ -14,11 +14,11 @@ public:
 
     virtual QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
 
-    void setWidth(const int width);
-    int getWidth() const;
+    void setRightMargin(const int width);
+    int getRightMargin() const;
 
 private:
-    int width;
+    int rightMargin;
 };
 
 #endif // MESSAGEDELEGATE_H

@@ -1,5 +1,7 @@
 #include "MainWidget.h"
 
+#include <QApplication>
+
 #include <QJsonObject>
 #include <QJsonArray>
 
@@ -136,27 +138,12 @@ void MainWidget::closeEvent(QCloseEvent *event)
     }
 }
 
-void MainWidget::paintEvent(QPaintEvent *event)
-{
-    QWidget::paintEvent(event);
-
-    //Only here on first launch scrollbar will be "visible"
-    auto delegateWidth = chatHistoryView->width();
-    if(chatHistoryView->verticalScrollBar()->isVisible()){
-        delegateWidth -= chatHistoryView->verticalScrollBar()->width();
-    }
-    if(delegateWidth != messageItemDelegate->getWidth()){
-        messageItemDelegate->setWidth(delegateWidth);
-        messageModel->wantsUpdate();
-    }
-}
-
 void MainWidget::cleanChat()
 {
     currentRequest = nullptr;
 
     messageModel->setMessages(std::vector<ChatMessageData>());
-    messagesViewer->setDataFromModel(messageModel);
+    messagesViewer->setModel(messageModel);
 }
 
 void MainWidget::setupLayout()
@@ -182,8 +169,16 @@ void MainWidget::setupLayout()
     messageErrorLabel->setStyleSheet(ERROR_LABEL_STYLE);
     messageErrorLabel->hide();
 
-    messagesViewer->setDataFromModel(messageModel);
+    messagesViewer->setModel(messageModel);
     messagesWidgetContentLayout->addWidget(messagesViewer);
+    // messagesWidgetContentLayout->addWidget(chatHistoryView);
+
+    // auto scrollbarWidth = qApp->style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+    // scrollbarWidth += chatHistoryView->width() - chatHistoryView->viewport()->width();
+    // messageItemDelegate->setRightMargin(scrollbarWidth);
+    // chatHistoryView->setItemDelegate(messageItemDelegate);
+    // chatHistoryView->setModel(messageModel);
+    // chatHistoryView->setVerticalScrollMode(QListView::ScrollPerPixel);
 
     messagesWidgetContentLayout->addSpacing(5);
 
@@ -350,7 +345,10 @@ void MainWidget::onGetChatMessagesReceived(const std::vector<ChatMessageData> ch
     }
 
     messageModel->setMessages(std::move(chatHistory));
-    messagesViewer->setDataFromModel(messageModel);
+    messagesViewer->setModel(messageModel);
+    messagesViewer->updateGeometry();
+    connect(messagesViewer, &MessagesViewer::resized,
+            this, &MainWidget::onMessagesViewerResized);
     messagesViewer->verticalScrollBar()->setValue(messagesViewer->verticalScrollBar()->maximum());
 
     finishRequest();
@@ -413,6 +411,12 @@ void MainWidget::onSettingsWidgetCanceled()
     else{
         close();
     }
+}
+
+void MainWidget::onMessagesViewerResized()
+{
+    messagesViewer->verticalScrollBar()->setValue(messagesViewer->verticalScrollBar()->maximum());
+    disconnect(messagesViewer, &MessagesViewer::resized, this, &MainWidget::onMessagesViewerResized);
 }
 
 void MainWidget::onNewUserSubmitted(const QString &username, const QString &password, const UserRole role)

@@ -3,7 +3,10 @@
 
 #include <QScrollArea>
 
+#include <QVBoxLayout>
+
 #include <QAbstractItemModel>
+#include <QAbstractListModel>
 #include <QLabel>
 
 #include <list>
@@ -14,17 +17,25 @@ class MessagesViewer : public QScrollArea
 public:
     explicit MessagesViewer(QWidget *parent = nullptr);
 
-    void setDataFromModel(const QAbstractItemModel * const model);
+    void setModel(const QAbstractListModel *modelToSet);
 
 signals:
+    void messagesIdsAbouttoBeViewed(const quint64 fromId, const quint64 toId);
+    void resized();
 
 protected:
     virtual void resizeEvent(QResizeEvent *event) override;
 
 private:
-    QWidget* mainWidget;
+    const QAbstractListModel* model;
 
-    std::list<QLabel*> verticalLabelsList;
+    QWidget* mainWidget;
+    QVBoxLayout* mainWidgetLayout;
+
+
+    std::list<QWidget*> messageWidgets;
+
+    void fillFromModel();
 };
 
 #endif // MESSAGESVIEWER_H

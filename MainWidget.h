@@ -163,8 +163,6 @@ private:
 
     bool disconnecting;
 
-    virtual void paintEvent(QPaintEvent *event) override;
-
     void cleanChat();
     void setupLayout();
 
@@ -195,6 +193,8 @@ private slots:
 
     void onSettingsSaved(const std::set<Settings>& changedSettings);
     void onSettingsWidgetCanceled();
+
+    void onMessagesViewerResized();
 
     void onNewUserSubmitted(const QString& username, const QString& password, const UserRole role);
     void onAddUserResultReceived(const ErrorInfo& errorInfo);

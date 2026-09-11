@@ -15,31 +15,42 @@ const QString dateTimeFormat = "dd.MM.yyyy hh:mm:ss";
 
 MessagesViewer::MessagesViewer(QWidget *parent)
     : QScrollArea{parent},
-      mainWidget(nullptr)
+    mainWidget(new QWidget(this)),
+    mainWidgetLayout(new QVBoxLayout(mainWidget))
 {
+    setWidgetResizable(true);
+    setWidget(mainWidget);
 
+    mainWidget->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
 }
 
-void MessagesViewer::setDataFromModel(const QAbstractItemModel * const model)
-{    
-    auto oldMainwidget = takeWidget();
-    if(oldMainwidget != nullptr){
-        oldMainwidget->deleteLater();
-    }
-    verticalLabelsList.clear();
+void MessagesViewer::setModel(const QAbstractListModel * modelToSet)
+{
+    model = modelToSet;
 
-    mainWidget = new QWidget();
-    mainWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
-    auto mainLayout = new QVBoxLayout(mainWidget);
-    mainLayout->setSizeConstraint(QLayout::SetMinimumSize);
+    fillFromModel();
+}
+
+void MessagesViewer::resizeEvent(QResizeEvent *event)
+{
+    QScrollArea::resizeEvent(event);
+
+    emit resized();
+}
+
+void MessagesViewer::fillFromModel()
+{
+    for(auto& widget: messageWidgets){
+        widget->deleteLater();
+    }
+    messageWidgets.clear();
 
     for (int i = 0; i < model->rowCount() ; ++i) {
         auto modelIndex = model->index(i, 0);
 
-//        auto messageWidget = new DependingWidthWidget();
         auto messageWidget = new QWidget();
         messageWidget->setObjectName("messageWidget");
-        messageWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+        messageWidget->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
         messageWidget->setStyleSheet("QWidget#messageWidget{"
                                      "background-color: #E0E0E0;"
                                      "border: 1px solid #AAAAAA;"
@@ -47,41 +58,22 @@ void MessagesViewer::setDataFromModel(const QAbstractItemModel * const model)
                                      "}");
         auto messageLayout = new QVBoxLayout();
         messageWidget->setLayout(messageLayout);
-        messageLayout->setSizeConstraint(QLayout::SetMinimumSize);
         auto messageHeaderLayout = new QHBoxLayout();
 
         auto usernameLabel = new QLabel(modelIndex.data(MessageDataRole::Username).toString());
-        verticalLabelsList.push_back(usernameLabel);
         auto messageDateTime = new QLabel(modelIndex.data(MessageDataRole::Time).toDateTime().toString(dateTimeFormat));
         messageHeaderLayout->addWidget(usernameLabel);
         messageHeaderLayout->addWidget(messageDateTime, 0, Qt::AlignRight);
 
-//        auto messageTextLabel = new MessageLabel(modelIndex.data(MessageDataRole::Text).toString());
+        //        auto messageTextLabel = new MessageLabel(modelIndex.data(MessageDataRole::Text).toString());
         auto messageTextLabel = new QLabel(modelIndex.data(MessageDataRole::Text).toString());
-        messageTextLabel->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Maximum);
+        messageTextLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
         messageTextLabel->setWordWrap(true);
-        verticalLabelsList.push_back(messageTextLabel);
 
-//        messageWidget->setWidthSourceWidget(messageTextLabel);
+        messageWidgets.push_back(messageWidget);
 
         messageLayout->addLayout(messageHeaderLayout);
         messageLayout->addWidget(messageTextLabel);
-//        mainLayout->addLayout(messageLayout);
-        mainLayout->addWidget(messageWidget);
+        mainWidgetLayout->addWidget(messageWidget);
     }
-
-    setWidget(mainWidget);
-}
-
-void MessagesViewer::resizeEvent(QResizeEvent *event)
-{
-    QScrollArea::resizeEvent(event);
-
-    int verticalScrollBarWidth = 0;
-    if(verticalScrollBar()->isVisible()){
-        verticalScrollBarWidth = verticalScrollBar()->width();
-    }
-    mainWidget->setFixedWidth(this->width() - verticalScrollBarWidth);
-
-    mainWidget->adjustSize();
 }
