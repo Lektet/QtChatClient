@@ -4,76 +4,76 @@
 <context>
     <name>MainWidget</name>
     <message>
-        <location filename="MainWidget.cpp" line="62"/>
+        <location filename="MainWidget.cpp" line="65"/>
         <source>Messsages</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="63"/>
+        <location filename="MainWidget.cpp" line="66"/>
         <source>User Managment</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="69"/>
+        <location filename="MainWidget.cpp" line="72"/>
         <source>Message empty!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="71"/>
+        <location filename="MainWidget.cpp" line="74"/>
         <source>sendButton</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="202"/>
+        <location filename="MainWidget.cpp" line="200"/>
         <source>Message:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="272"/>
+        <location filename="MainWidget.cpp" line="270"/>
         <source>Connection error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="272"/>
+        <location filename="MainWidget.cpp" line="270"/>
         <source>Disconnected by server</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="307"/>
-        <location filename="MainWidget.cpp" line="313"/>
-        <source>Login error</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="MainWidget.cpp" line="307"/>
-        <location filename="MainWidget.cpp" line="313"/>
-        <source>Invalid login data received</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="MainWidget.cpp" line="455"/>
-        <source>Create user error</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="MainWidget.cpp" line="288"/>
+        <location filename="MainWidget.cpp" line="286"/>
         <source>Received invalid  user id!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="336"/>
-        <location filename="MainWidget.cpp" line="340"/>
+        <location filename="MainWidget.cpp" line="305"/>
+        <location filename="MainWidget.cpp" line="311"/>
+        <source>Login error</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="MainWidget.cpp" line="305"/>
+        <location filename="MainWidget.cpp" line="311"/>
+        <source>Invalid login data received</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="MainWidget.cpp" line="337"/>
+        <location filename="MainWidget.cpp" line="341"/>
         <source>Error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="449"/>
+        <location filename="MainWidget.cpp" line="578"/>
         <source>User created</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="MainWidget.cpp" line="449"/>
+        <location filename="MainWidget.cpp" line="578"/>
         <source>New user successfully created!</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="MainWidget.cpp" line="584"/>
+        <source>Create user error</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

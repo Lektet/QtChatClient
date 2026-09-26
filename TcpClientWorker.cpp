@@ -10,6 +10,10 @@
 #include "NewSessionConfirmMessage.h"
 #include "GetChatMessagesMessage.h"
 #include "GetChatMessagesResponseMessage.h"
+#include "GetChatMessagesNearIdMessage.h"
+#include "GetChatFirstMessageIdMessage.h"
+#include "GetChatLastMessageIdMessage.h"
+#include "GetChatMessageIdResponse.h"
 #include "AddMessageMessage.h"
 #include "NotificationMessage.h"
 #include "AddUserMessage.h"
@@ -52,6 +56,31 @@ void TcpClientWorker::init()
 void TcpClientWorker::requestChatMessages(const QUuid &sessionId)
 {
     Request request(std::make_shared<GetChatMessagesMessage>(sessionId));
+    requestQueue.push(std::move(request));
+    continueRequestProcessing();
+}
+
+void TcpClientWorker::requestMessagesNearId(const QUuid &sessionId, const QString &id, const int beforeNum, const int afterNum, bool includeId)
+{
+    Request request(std::make_shared<GetChatMessagesNearIdMessage>(sessionId,
+                                                                   id,
+                                                                   beforeNum,
+                                                                   afterNum,
+                                                                   includeId));
+    requestQueue.push(std::move(request));
+    continueRequestProcessing();
+}
+
+void TcpClientWorker::requestChatFirstMessageId(const QUuid &sessionId)
+{
+    Request request(std::make_shared<SessionMessage>(sessionId, MessageType::GetChatFirstMessageId));
+    requestQueue.push(std::move(request));
+    continueRequestProcessing();
+}
+
+void TcpClientWorker::requestChatLastMessageId(const QUuid &sessionId)
+{
+    Request request(std::make_shared<SessionMessage>(sessionId, MessageType::GetChatLastMessageId));
     requestQueue.push(std::move(request));
     continueRequestProcessing();
 }
@@ -203,6 +232,39 @@ void TcpClientWorker::processMessageData(const QByteArray &data)
             }
 
             emit chatMessagesReceived(responseMessage.getMessagesHistory(), responseMessage.getErrorInfo());
+            break;
+        }
+        case MessageType::GetChatFirstMessageIdResponse:{
+            bool success = false;
+            auto responseMessage = MessageUtils::createMessageFromJson<GetChatMessageIdResponse>(document, &success);
+            if(!success){
+                qWarning() << "Error parsing received message";
+                break;
+            }
+
+            emit getChatFirstMessageIdResultReceived(responseMessage.getMessageId(), responseMessage.getErrorInfo());
+            break;
+        }
+        case MessageType::GetChatLastMessageIdResponse:{
+            bool success = false;
+            auto responseMessage = MessageUtils::createMessageFromJson<GetChatMessageIdResponse>(document, &success);
+            if(!success){
+                qWarning() << "Error parsing received message";
+                break;
+            }
+
+            emit getChatLastMessageIdResultReceived(responseMessage.getMessageId(), responseMessage.getErrorInfo());
+            break;
+        }
+        case MessageType::GetChatMessagesNearIdResponse:{
+            bool success = false;
+            auto responseMessage = MessageUtils::createMessageFromJson<GetChatMessagesResponseMessage>(document, &success);
+            if(!success){
+                qWarning() << "Error parsing received message";
+                break;
+            }
+
+            emit getChatMessagesNearIdResultReceived(responseMessage.getMessagesHistory(), responseMessage.getErrorInfo());
             break;
         }
         case MessageType::ResponseMessage:{

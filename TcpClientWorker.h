@@ -53,6 +53,13 @@ public slots:
     void requestConfirmSession(const QUuid& userId, const QUuid& sessionId);
 
     void requestChatMessages(const QUuid& sessionId);
+    void requestMessagesNearId(const QUuid &sessionId,
+                               const QString& id,
+                               const int beforeNum,
+                               const int afterNum,
+                               bool includeId);
+    void requestChatFirstMessageId(const QUuid &sessionId);
+    void requestChatLastMessageId(const QUuid& sessionId);
     void requestAddChatMessage(const QUuid& sessionId, const NewChatMessageData& message);
 
     void requestAddUser(const QUuid &sessionId, const QString &username, const QString &password, const UserRole role);
@@ -69,6 +76,10 @@ signals:
     void errorReceived(const ErrorInfo &errorInfo);
 
     void chatMessagesReceived(const std::vector<ChatMessageData> history, const ErrorInfo &errorInfo);
+    void getChatMessagesNearIdResultReceived(const std::vector<ChatMessageData> messages, const ErrorInfo &errorInfo);
+    void getChatLastMessageIdResultReceived(const QString& id, const ErrorInfo &errorInfo);
+    void getChatFirstMessageIdResultReceived(const QString& id, const ErrorInfo &errorInfo);
+
     void addChatMessageResultReceived(const ErrorInfo &errorInfo);
     void chatHasBeenUpdated();
     void addUserResultReceived(const ErrorInfo &errorInfo);

@@ -5,25 +5,31 @@
 
 #include "ChatMessageData.h"
 
-#include <vector>
+#include <deque>
 
-class MessageModel : public QAbstractListModel
+class MessagesModel : public QAbstractListModel
 {
     Q_OBJECT
 
 public:
-    explicit MessageModel(QObject *parent = nullptr);
+    explicit MessagesModel(QObject *parent = nullptr);
 
     virtual int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 
-    void setMessages(const std::vector<ChatMessageData> messages);
+    void setMessages(const std::vector<ChatMessageData> messagesToSet);
+    void addMessages(std::vector<ChatMessageData> messagesToAdd);
+    void removeMessages(const int from, int count);
 
-    void wantsUpdate();
-
+    quint64 findIdIndex(const QString& element);
 
 private:
-    std::vector<ChatMessageData> messages;
+    using MessagesDeque = std::deque<ChatMessageData>;
+    MessagesDeque messages;
+    std::unordered_map<QString, MessagesDeque::iterator> messageIteratorById;
+
+    quint64 minId;
+    quint64 maxId;
 };
 
 #endif // MESSAGESMODEL_H

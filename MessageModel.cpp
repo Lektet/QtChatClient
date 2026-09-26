@@ -4,6 +4,8 @@
 
 #include "MessageDataRole.h"
 
+#include <ranges>
+
 #include <QDebug>
 
 const QString MESSAGE_USERNAME_KEY = "Username";
@@ -11,18 +13,20 @@ const QString MESSAGE_TEXT_KEY = "Text";
 const QString MESSAGE_ID_KEY = "Id";
 const QString MESSAGE_POST_TIME_KEY = "Time";
 
-MessageModel::MessageModel(QObject *parent) :
-    QAbstractListModel{parent}
+MessagesModel::MessagesModel(QObject *parent) :
+    QAbstractListModel{parent},
+    minId(0),
+    maxId(0)
 {
 
 }
 
-int MessageModel::rowCount(const QModelIndex &parent) const
+int MessagesModel::rowCount(const QModelIndex &parent) const
 {
     return messages.size();
 }
 
-QVariant MessageModel::data(const QModelIndex &index, int role) const
+QVariant MessagesModel::data(const QModelIndex &index, int role) const
 {
     if(!index.isValid()){
         qWarning() << "Invalid model index";
@@ -61,15 +65,110 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     }
 }
 
-//TODO: Make only required changes in messages
-void MessageModel::setMessages(const std::vector<ChatMessageData> messages)
+//TODO: Make only required changes in messagesToSet
+void MessagesModel::setMessages(const std::vector<ChatMessageData> messagesToSet)
 {
     beginResetModel();
-    this->messages = messages;
+    for(auto& message: messagesToSet){
+        auto it = messages.insert(messages.cend(), message);
+        messageIteratorById[message.id] = it;
+    }
+
     endResetModel();
 }
 
-void MessageModel::wantsUpdate()
+void MessagesModel::addMessages(std::vector<ChatMessageData> messagesToAdd)
 {
-    emit layoutChanged();
+    if(messagesToAdd.empty()){
+        return;
+    }
+
+    if(messages.empty()){
+        beginInsertRows(QModelIndex(), 0, messagesToAdd.size());
+        messages.insert(messages.begin(), messagesToAdd.begin(), messagesToAdd.end());
+        endInsertRows();
+        return;
+    }
+
+    auto firstMessageToAddId = messagesToAdd.front().id.toULongLong();
+    if(firstMessageToAddId > maxId){
+        maxId = messagesToAdd.back().id.toULongLong();
+        beginInsertRows(QModelIndex(), rowCount(), rowCount() + messagesToAdd.size());
+        for(const auto& message :messagesToAdd){
+            messages.push_back(std::move(message));
+        }
+        endInsertRows();
+        return;
+    }
+
+    auto lastMessageToAddId = messagesToAdd.back().id.toULongLong();
+    if(lastMessageToAddId < minId){
+        minId = firstMessageToAddId;
+        beginInsertRows(QModelIndex(), 0, messagesToAdd.size());
+        for(const auto& message : std::ranges::views::reverse(messagesToAdd)){
+            messages.push_front(std::move(message));
+        }
+        endInsertRows();
+        return;
+    }
+
+    int i = 0;
+    for(auto it = messages.begin(); it <= messages.end(); ++it, ++i){
+        auto msgId = it->id.toULongLong();
+        if(msgId > firstMessageToAddId){
+            if(msgId <= lastMessageToAddId){
+                qWarning() << "Messages to insert have unsuitable id!";
+                return;
+            }
+
+            beginInsertRows(QModelIndex(), i, messagesToAdd.size());
+            messages.insert(it, messagesToAdd.begin(), messagesToAdd.end());
+            endInsertRows();
+            break;
+        }
+    }
+}
+
+void MessagesModel::removeMessages(const int from, int count)
+{
+    if(from < 0 || from >= rowCount()){
+        qWarning() << "Invalid from argument value";
+        return;
+    }
+    if(count < 0){
+        qWarning() << "Invalid count argument value";
+        return;
+    }
+    if((from + count) > rowCount()){
+        qWarning() << "Invalid arguments";
+        return;
+    }
+
+    beginRemoveRows(QModelIndex(), from, from + count - 1);
+
+    if(from == 0){
+        for(int i = 0; i < count; ++i){
+            messages.pop_back();
+        }
+        minId = messages.back().id.toULongLong();
+    }
+    else if(rowCount() == (from + count)){
+        for(int i = 0; i < count; ++i){
+            messages.pop_front();
+        }
+        maxId = messages.front().id.toULongLong();
+    }
+    else{
+        messages.erase(messages.begin() + from, messages.begin() + from + count - 1);
+    }
+
+    endRemoveRows();
+}
+
+quint64 MessagesModel::findIdIndex(const QString &element)
+{
+    auto it = std::find_if(messages.begin(), messages.end(), [&element](const ChatMessageData& data){
+        return data.id == element;
+    });
+    return std::distance(messages.begin(), it);
 }

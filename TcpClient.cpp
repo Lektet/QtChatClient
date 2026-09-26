@@ -38,6 +38,53 @@ void TcpClient::requestChatMessages(const QUuid &sessionId) const
                               Q_ARG(QUuid, sessionId));
 }
 
+void TcpClient::requestMessagesNearId(const QUuid &sessionId,
+                                      const QString &id,
+                                      const int beforeNum,
+                                      const int afterNum,
+                                      bool includeId) const
+{
+    if(!started){
+        qWarning() << "Client was not started!";
+        return;
+    }
+
+    QMetaObject::invokeMethod(worker,
+                              "requestMessagesNearId",
+                              Qt::QueuedConnection,
+                              Q_ARG(QUuid, sessionId),
+                              Q_ARG(QString, id),
+                              Q_ARG(int, beforeNum),
+                              Q_ARG(int, afterNum),
+                              Q_ARG(bool, includeId));
+}
+
+void TcpClient::requestChatFirstMessageId(const QUuid &sessionId) const
+{
+    if(!started){
+        qCritical() << "Client is not started!";
+        return;
+    }
+
+    QMetaObject::invokeMethod(worker,
+                              "requestChatFirstMessageId",
+                              Qt::QueuedConnection,
+                              Q_ARG(QUuid, sessionId));
+}
+
+void TcpClient::requestChatLastMessageId(const QUuid &sessionId) const
+{
+    if(!started){
+        qCritical() << "Client is not started!";
+        return;
+    }
+
+    QMetaObject::invokeMethod(worker,
+                              "requestChatLastMessageId",
+                              Qt::QueuedConnection,
+                              Q_ARG(QUuid, sessionId));
+}
+
 void TcpClient::addChatMessage(const QUuid &sessionId, const NewChatMessageData &message) const
 {
     if(!started){
@@ -114,6 +161,12 @@ void TcpClient::start(const QString &host, const quint16 port)
             this, &TcpClient::errorReceived, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::chatMessagesReceived,
             this, &TcpClient::chatMessagesReceived, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::getChatMessagesNearIdResultReceived,
+            this, &TcpClient::getChatMessagesNearIdResultReceived, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::getChatFirstMessageIdResultReceived,
+            this, &TcpClient::getChatFirstMessageIdResultReceived, Qt::QueuedConnection);
+    connect(worker, &TcpClientWorker::getChatLastMessageIdResultReceived,
+            this, &TcpClient::getChatLastMessageIdResultReceived, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::addChatMessageResultReceived,
             this, &TcpClient::addChatMessageResultReceived, Qt::QueuedConnection);
     connect(worker, &TcpClientWorker::connectedSucessfully,

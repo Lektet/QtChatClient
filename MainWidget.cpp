@@ -16,6 +16,7 @@
 
 #include "TcpClient.h"
 #include "MessageModel.h"
+#include "MessageDataRole.h"
 #include "MessageItemDelegate.h"
 #include "MessagesViewer.h"
 #include "SettingsWidget.h"
@@ -36,6 +37,8 @@ const QString ERROR_LABEL_STYLE = "QLabel{"
 const QString CHAT_HISTORY_VIEW_STYLE = "QListView::item:selected{"
                                         "selection-background-color: rgb(128,128,255);"
                                         "}";
+
+const int PRELOAD_IDS_COUNT = 10;
 
 const std::set<Settings> settingsRequiringReconnect = {
     Settings::Username,
@@ -62,7 +65,7 @@ MainWidget::MainWidget(QWidget *parent)
     messagesAction(new QAction(tr("Messsages"))),
     userManagmentAction(new QAction(tr("User Managment"))),
     widgetLayout(new QVBoxLayout(this)),
-    chatHistoryView(new QListView()),
+    // chatHistoryView(new QListView()),
     messageItemDelegate(new MessageItemDelegate(this)),
     messagesViewer(new MessagesViewer(this)),
     sendMessageWidget(new QWidget()),
@@ -73,7 +76,7 @@ MainWidget::MainWidget(QWidget *parent)
     settingsWidget(std::make_unique<SettingsWidget>()),
     tcpClient(new TcpClient(this)),
     currentRequest(nullptr),
-    messageModel(new MessageModel(this)),
+    messageModel(new MessagesModel(this)),
     disconnecting(false)
 {
     setupLayout();
@@ -103,6 +106,14 @@ MainWidget::MainWidget(QWidget *parent)
             this, &MainWidget::onAddChatMessageResultReceived);
     connect(tcpClient, &TcpClient::chatMessagesReceived,
             this, &MainWidget::onGetChatMessagesReceived);
+    // connect(tcpClient, &TcpClient::addGetChatMessagesIdsRangeReceived,
+    //         this, &MainWidget::onGetChatMessgesIdsRangeReceived);
+    connect(tcpClient, &TcpClient::getChatMessagesNearIdResultReceived,
+            this, &MainWidget::onGetChatMessgesNearIdReceived);
+    connect(tcpClient, &TcpClient::getChatLastMessageIdResultReceived,
+            this, &MainWidget::onGetChatLastMessageIdResultReceived);
+    connect(tcpClient, &TcpClient::getChatFirstMessageIdResultReceived,
+            this, &MainWidget::onGetChatFirstMessageIdResultReceived);
     connect(tcpClient, &TcpClient::startedSuccessfully,
             this, &MainWidget::onStartedSuccessfully);
     connect(tcpClient, &TcpClient::serverReceivedBadRequest,
@@ -304,8 +315,11 @@ void MainWidget::onNewSessionRequestResultReceived(const QUuid &receivedUserId,
 
     sessionId = receivedSessionId;
 
-    auto chatRequest = std::make_unique<Request>(RequestType::ChatHistory);
-    pushRequest(std::move(chatRequest));
+    // auto chatRequest = std::make_unique<Request>(RequestType::ChatHistory);
+    // pushRequest(std::move(chatRequest));
+
+    auto lastMessageIdRequest = std::make_unique<Request>(RequestType::GetChatLastMessageId);
+    pushRequest(std::move(lastMessageIdRequest));
 
     userManagmentAction->setDisabled(userRole != UserRole::Admin);
     sendMessageWidget->setVisible(userRole != UserRole::Guest);
@@ -349,7 +363,110 @@ void MainWidget::onGetChatMessagesReceived(const std::vector<ChatMessageData> ch
     messagesViewer->updateGeometry();
     connect(messagesViewer, &MessagesViewer::resized,
             this, &MainWidget::onMessagesViewerResized);
+    connect(messagesViewer, &MessagesViewer::viewedMessagesChanged,
+            this, &MainWidget::onViewedMessagesChanged);
     messagesViewer->verticalScrollBar()->setValue(messagesViewer->verticalScrollBar()->maximum());
+
+    finishRequest();
+}
+
+// void MainWidget::onGetChatMessgesIdsRangeReceived(const QString &from, const QString &to, const ErrorInfo &errorInfo)
+// {
+//     if(from.isEmpty() || to.isEmpty()){
+//         qDebug() << "Received ids range value is null!";
+//         QMessageBox::warning(this,
+//                              tr("Get chat messages ids range error"),
+//                              tr("Received value is empty"));
+//         finishRequest();
+//     }
+
+//     if(errorInfo.errorCode != ErrorCode::NoError){
+//         warn(this,
+//              "Get chat messages ids range error",
+//              "Failed to get ids of chat messages available to view!",
+//              errorInfo);
+//         finishRequest();
+//     }
+
+//     auto request = std::make_unique<GetChatMessagesInRangeRequest>(QString(from), QString(to));
+//     pushRequest(std::move(request));
+
+//     finishRequest();
+// }
+
+void MainWidget::onGetChatLastMessageIdResultReceived(const QString &id, const ErrorInfo &errorInfo)
+{
+    if(errorInfo.errorCode != ErrorCode::NoError){
+        warn(this, "Get chat last message id error", "Error on requesting chat last message id", errorInfo);
+        finishRequest();
+    }
+
+    if(id.isEmpty()){
+        finishRequest();
+    }
+
+    if(messagesViewer->viewedIds().empty()){
+        auto request = std::make_unique<GetChatMessagesNearIdRequest>(id, PRELOAD_IDS_COUNT, 0, true);
+        pushRequest(std::move(request));
+        finishRequest();
+        return;
+    }
+
+    auto lastDisplayedMessageId = messagesViewer->viewedIds().front();
+    auto index = messageModel->findIdIndex(lastDisplayedMessageId);
+    if(messageModel->rowCount() - 1 - index < PRELOAD_IDS_COUNT){
+        auto request = std::make_unique<GetChatMessagesNearIdRequest>(id, 0, 0, true);
+        pushRequest(std::move(request));
+    }
+    finishRequest();
+}
+
+void MainWidget::onGetChatFirstMessageIdResultReceived(const QString &id, const ErrorInfo &errorInfo)
+{
+    if(errorInfo.errorCode != ErrorCode::NoError){
+        warn(this, "Get chat first message id error", "Error on requesting chat first message id", errorInfo);
+        finishRequest();
+    }
+
+    if(id.isEmpty()){
+        finishRequest();
+    }
+
+    if(availableMessageIds.back() == id){
+        finishRequest();
+    }
+
+    if(messagesViewer->viewedIds().empty()){
+        auto request = std::make_unique<GetChatMessagesNearIdRequest>(id, 0, PRELOAD_IDS_COUNT, true);
+        pushRequest(std::move(request));
+        finishRequest();
+        return;
+    }
+
+    auto firstDisplayedMessageId = messagesViewer->viewedIds().back();
+    auto index = messageModel->findIdIndex(firstDisplayedMessageId);
+    if(index - PRELOAD_IDS_COUNT <= 0){
+        auto request = std::make_unique<GetChatMessagesNearIdRequest>(id, 0, 0, true);
+        pushRequest(std::move(request));
+    }
+    finishRequest();
+}
+
+void MainWidget::onGetChatMessgesNearIdReceived(const std::vector<ChatMessageData> chatMessages, const ErrorInfo &errorInfo)
+{
+    if(errorInfo.errorCode != ErrorCode::NoError){
+        warn(this,
+             "Get chat messages in range error",
+             "Failed to get ids of chat messages in range!",
+             errorInfo);
+        finishRequest();
+    }
+
+    if(chatMessages.empty()){
+        finishRequest();
+    }
+
+    messageModel->addMessages(chatMessages);
 
     finishRequest();
 }
@@ -361,7 +478,7 @@ void MainWidget::onTcpClientStopped()
         return;
     }
 
-    std::queue<std::unique_ptr<Request>> empty;
+    std::deque<std::unique_ptr<Request>> empty;
     std::swap(requestQueue, empty);
     settingsWidget->show();
 }
@@ -419,6 +536,31 @@ void MainWidget::onMessagesViewerResized()
     disconnect(messagesViewer, &MessagesViewer::resized, this, &MainWidget::onMessagesViewerResized);
 }
 
+void MainWidget::onViewedMessagesChanged()
+{
+    for(auto& request: requestQueue){
+        if(request->type == RequestType::GetChatMessagesNearId){
+            return;
+        }
+    }
+
+    auto viewedIndexes = messagesViewer->viewedIndexes();
+    auto lastViewedMessageIndex = viewedIndexes.front();
+    if(lastViewedMessageIndex < messageModel->rowCount() - 1 - PRELOAD_IDS_COUNT){
+        auto id = messageModel->data(messageModel->index(messageModel->rowCount() - 1), MessageDataRole::Id).toString();
+        auto request = std::make_unique<GetChatMessagesNearIdRequest>(id, 0, PRELOAD_IDS_COUNT, false);
+        pushRequest(std::move(request));
+        return;
+    }
+    auto firstViewedMessageIndex = viewedIndexes.back();
+    if(firstViewedMessageIndex < PRELOAD_IDS_COUNT){
+        auto id = messageModel->data(messageModel->index(0), MessageDataRole::Id).toString();
+        auto request = std::make_unique<GetChatMessagesNearIdRequest>(id, PRELOAD_IDS_COUNT, 0, false);
+        pushRequest(std::move(request));
+        return;
+    }
+}
+
 void MainWidget::onNewUserSubmitted(const QString &username, const QString &password, const UserRole role)
 {
     auto request = std::make_unique<AddUserRequest>(username, password, role);
@@ -454,7 +596,7 @@ void MainWidget::finishRequest()
 
 void MainWidget::pushRequest(std::unique_ptr<Request> request)
 {
-    requestQueue.push(std::move(request));
+    requestQueue.push_back(std::move(request));
     if(currentRequest == nullptr){
         processTopRequest();
     }
@@ -467,7 +609,7 @@ void MainWidget::processTopRequest()
     }
 
     currentRequest = std::move(requestQueue.front());
-    requestQueue.pop();
+    requestQueue.pop_front();
 
     switch (currentRequest->type) {
     case RequestType::NewSession:{
@@ -480,6 +622,21 @@ void MainWidget::processTopRequest()
         break;
     case RequestType::ChatHistory:
         tcpClient->requestChatMessages(sessionId);
+        break;
+    case RequestType::GetChatMessagesNearId:{
+        auto request = static_cast<GetChatMessagesNearIdRequest*>(currentRequest.get());
+        tcpClient->requestMessagesNearId(sessionId,
+                                             request->id,
+                                             request->beforeNum,
+                                             request->afterNum,
+                                             request->include);
+        break;
+    }
+    case RequestType::GetChatFirstMessageId:
+        tcpClient->requestChatFirstMessageId(sessionId);
+        break;
+    case RequestType::GetChatLastMessageId:
+        tcpClient->requestChatLastMessageId(sessionId);
         break;
     case RequestType::SendMessage:{
         auto request = static_cast<SendMessageRequest*>(currentRequest.get());

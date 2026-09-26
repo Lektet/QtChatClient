@@ -22,7 +22,7 @@
 
 class MessageItemDelegate;
 class TcpClient;
-class MessageModel;
+class MessagesModel;
 class MessagesViewer;
 class SettingsWidget;
 class UserManagmentWidget;
@@ -53,6 +53,9 @@ private:
         NewSession,
         ConfirmSession,
         ChatHistory,
+        GetChatMessagesNearId,
+        GetChatFirstMessageId,
+        GetChatLastMessageId,
         SendMessage,
         AddUser,
         DeleteUser
@@ -120,12 +123,30 @@ private:
             password(std::move(newUserPassword)),
             role(newUserRole)
         {
-
         };
 
         QString username;
         QString password;
         UserRole role;
+    };
+
+    struct GetChatMessagesNearIdRequest: public Request{
+        explicit GetChatMessagesNearIdRequest(QString messageId,
+                                               int numberOfMessagesBefore,
+                                               int numberOfMessagesAfter,
+                                               bool includeMessageWithSpecifiedId):
+            Request(RequestType::GetChatMessagesNearId),
+            id(std::move(messageId)),
+            beforeNum(numberOfMessagesBefore),
+            afterNum(numberOfMessagesAfter),
+            include(includeMessageWithSpecifiedId)
+        {
+        };
+
+        QString id;
+        int beforeNum;
+        int afterNum;
+        bool include;
     };
 
     QStackedWidget* stackedWidget;
@@ -134,7 +155,7 @@ private:
     QAction* userManagmentAction;
     QVBoxLayout* widgetLayout;
 
-    QListView* chatHistoryView;
+    // QListView* chatHistoryView;
     MessageItemDelegate* messageItemDelegate;
     MessagesViewer* messagesViewer;
     QWidget* sendMessageWidget;
@@ -150,10 +171,13 @@ private:
 
     TcpClient* tcpClient;
 
-    std::queue<std::unique_ptr<Request>> requestQueue;
+    std::deque<std::unique_ptr<Request>> requestQueue;
     std::unique_ptr<Request> currentRequest;
 
-    MessageModel* messageModel;
+    MessagesModel* messageModel;
+    std::deque<QString> availableMessageIds;
+    QString lastChatMessageId;
+    QString firstChatMessageId;
 
     QString username;
     QString password;
@@ -186,6 +210,11 @@ private slots:
 
     void onGetChatMessagesReceived(const std::vector<ChatMessageData> chatHistory,
                                    const ErrorInfo& errorInfo);
+    // void onGetChatMessgesIdsRangeReceived(const QString& from, const QString& to, const ErrorInfo &errorInfo);
+    void onGetChatLastMessageIdResultReceived(const QString& id, const ErrorInfo& errorInfo);
+    void onGetChatFirstMessageIdResultReceived(const QString &id, const ErrorInfo& errorInfo);
+    void onGetChatMessgesNearIdReceived(const std::vector<ChatMessageData> chatMessages,
+                                        const ErrorInfo& errorInfo);
     void onAddChatMessageResultReceived(const ErrorInfo &errorInfo);
 
     void onChatUpdated();
@@ -195,6 +224,7 @@ private slots:
     void onSettingsWidgetCanceled();
 
     void onMessagesViewerResized();
+    void onViewedMessagesChanged();
 
     void onNewUserSubmitted(const QString& username, const QString& password, const UserRole role);
     void onAddUserResultReceived(const ErrorInfo& errorInfo);

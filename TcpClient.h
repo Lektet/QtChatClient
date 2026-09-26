@@ -26,6 +26,13 @@ public:
     ~TcpClient();
 
     void requestChatMessages(const QUuid& sessionId) const;
+    void requestMessagesNearId(const QUuid &sessionId,
+                               const QString& id,
+                               const int beforeNum,
+                               const int afterNum,
+                               bool includeId) const;
+    void requestChatFirstMessageId(const QUuid &sessionId) const;
+    void requestChatLastMessageId(const QUuid& sessionId) const;
     void addChatMessage(const QUuid& sessionId,
                                    const NewChatMessageData &message) const;
 
@@ -52,6 +59,9 @@ signals:
 
     void chatMessagesReceived(const std::vector<ChatMessageData>& history, const ErrorInfo &errorInfo);
     void addChatMessageResultReceived(const ErrorInfo &errorInfo);
+    void getChatMessagesNearIdResultReceived(const std::vector<ChatMessageData> messages, const ErrorInfo &errorInfo);
+    void getChatLastMessageIdResultReceived(const QString& id, const ErrorInfo &errorInfo);
+    void getChatFirstMessageIdResultReceived(const QString& id, const ErrorInfo &errorInfo);
     void chatHasBeenUpdated();
     void addUserResultReceived(const ErrorInfo &errorInfo);
 
